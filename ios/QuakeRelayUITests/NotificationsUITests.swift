@@ -53,12 +53,18 @@ final class NotificationsUITests: XCTestCase {
         guard let code = ProcessInfo.processInfo.environment["QUAKERELAY_UI_PAIRING_CODE"] else {
             XCTFail("Missing loopback fixture pairing code"); return
         }
+        // A notification launch does not carry XCUIApplication.launchArguments.
+        // Relaunch with the loopback URL before pairing; never contact the example host.
+        app.terminate()
+        app.launch()
         let input = app.textFields["12345678"]
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         input.tap()
         input.typeText(code)
         app.buttons["ペアリング"].tap()
-        XCTAssertTrue(app.tabBars.buttons["津波"].waitForExistence(timeout: 15))
+        guard app.tabBars.buttons["津波"].waitForExistence(timeout: 15) else {
+            XCTFail("Loopback pairing did not complete"); return
+        }
         let ordinary = app.staticTexts["合成震源・通常情報"]
         XCTAssertTrue(ordinary.waitForExistence(timeout: 10))
         ordinary.tap()
