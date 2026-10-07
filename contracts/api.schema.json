@@ -1,0 +1,447 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quick Relay VPS API response models",
+  "description": "Select a response model using its $defs pointer. Secret tokens and raw frames are not part of report/device response models.",
+  "$defs": {
+    "Report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "event_id",
+        "server_sequence",
+        "message_id",
+        "classification",
+        "telegram_type",
+        "event_type",
+        "revision",
+        "is_final",
+        "is_cancelled",
+        "is_warning",
+        "title",
+        "body",
+        "occurred_at",
+        "received_at",
+        "origin_time",
+        "epicenter",
+        "max_intensity",
+        "latitude",
+        "longitude",
+        "magnitude",
+        "depth_km"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "event_id": {
+          "type": "string"
+        },
+        "server_sequence": {
+          "type": "integer"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "classification": {
+          "type": "string",
+          "enum": [
+            "eew.forecast",
+            "eew.warning",
+            "telegram.earthquake"
+          ]
+        },
+        "telegram_type": {
+          "type": "string"
+        },
+        "event_type": {
+          "type": "string"
+        },
+        "revision": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "is_final": {
+          "type": "boolean"
+        },
+        "is_cancelled": {
+          "type": "boolean"
+        },
+        "is_warning": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "received_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "origin_time": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "epicenter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_intensity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "latitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "longitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "magnitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "depth_km": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "hypocenter": {
+          "$ref": "#/$defs/Hypocenter"
+        }
+      }
+    },
+    "Event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "event_type",
+        "origin_time",
+        "epicenter",
+        "max_intensity",
+        "latitude",
+        "longitude",
+        "magnitude",
+        "depth_km",
+        "latest_revision",
+        "source_serial",
+        "classification",
+        "telegram_type",
+        "is_final",
+        "is_cancelled",
+        "is_warning",
+        "latest_report_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "category": {
+          "const": "earthquake"
+        },
+        "event_type": {
+          "type": "string"
+        },
+        "origin_time": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "epicenter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_intensity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "latitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "longitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "magnitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "depth_km": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "latest_revision": {
+          "type": "integer"
+        },
+        "source_serial": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "classification": {
+          "type": "string",
+          "enum": [
+            "eew.forecast",
+            "eew.warning",
+            "telegram.earthquake"
+          ]
+        },
+        "telegram_type": {
+          "type": "string"
+        },
+        "is_final": {
+          "type": "boolean"
+        },
+        "is_cancelled": {
+          "type": "boolean"
+        },
+        "is_warning": {
+          "type": "boolean"
+        },
+        "latest_report_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "hypocenter": {
+          "$ref": "#/$defs/Hypocenter"
+        }
+      }
+    },
+    "Preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "notifications_enabled",
+        "time_sensitive_enabled",
+        "custom_sound_enabled",
+        "event_types"
+      ],
+      "properties": {
+        "notifications_enabled": {
+          "type": "boolean"
+        },
+        "time_sensitive_enabled": {
+          "type": "boolean"
+        },
+        "custom_sound_enabled": {
+          "type": "boolean"
+        },
+        "event_types": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "maxItems": 20,
+          "items": {
+            "enum": [
+              "eew_forecast",
+              "eew_warning",
+              "eew_cancel",
+              "earthquake_info",
+              "earthquake_update",
+              "system_test"
+            ]
+          }
+        }
+      }
+    },
+    "Device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation_id",
+        "device_name",
+        "environment",
+        "app_version",
+        "os_version",
+        "last_seen_at",
+        "active",
+        "preferences"
+      ],
+      "properties": {
+        "installation_id": {
+          "type": "string"
+        },
+        "device_name": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "app_version": {
+          "type": "string"
+        },
+        "os_version": {
+          "type": "string"
+        },
+        "last_seen_at": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "preferences": {
+          "$ref": "#/$defs/Preferences"
+        }
+      }
+    },
+    "SyncPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "items",
+        "next_after_sequence",
+        "has_more",
+        "latest_committed_sequence",
+        "server_time"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "report",
+              "event"
+            ],
+            "properties": {
+              "report": {
+                "$ref": "#/$defs/Report"
+              },
+              "event": {
+                "$ref": "#/$defs/Event"
+              }
+            }
+          }
+        },
+        "next_after_sequence": {
+          "type": "integer"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "latest_committed_sequence": {
+          "type": "integer"
+        },
+        "server_time": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "Hypocenter": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Source values with explicit quality. Assumed values require the note/qualification in every display; legacy top-level values remain null. VXSE43 magnitude/depth are null here as well.",
+      "required": [
+        "status",
+        "origin_time",
+        "epicenter",
+        "latitude",
+        "longitude",
+        "depth_km",
+        "magnitude"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "estimated",
+            "assumed",
+            "low_accuracy"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "origin_time": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "epicenter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "latitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -180,
+          "maximum": 180
+        },
+        "depth_km": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "depth_condition": {
+          "type": "string"
+        },
+        "magnitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

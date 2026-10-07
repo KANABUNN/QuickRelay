@@ -1,0 +1,20 @@
+{
+  "aps": {
+    "alert": {
+      "title": "緊急地震速報（予報） 第1報",
+      "body": "日向灘で地震。 予想最大震度5弱。 M5.7。"
+    },
+    "sound": "quake_update.caf",
+    "interruption-level": "time-sensitive",
+    "thread-id": "20261005000000"
+  },
+  "event_id": "20261005000000",
+  "report_id": "fixture-report-1",
+  "eventId": "20261005000000",
+  "serial": 1,
+  "kind": "eew.forecast",
+  "cancel": false,
+  "final": false,
+  "warning": false,
+  "server_sequence": 1
+}

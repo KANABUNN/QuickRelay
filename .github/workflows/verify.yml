@@ -1,0 +1,61 @@
+name: Verify Quick Relay
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  server:
+    name: Server (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+      - name: Verify Linux including race detector
+        if: runner.os == 'Linux'
+        run: sh scripts/verify.sh
+      - name: Verify Windows and cross-build Linux
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/verify.ps1
+      - name: Validate deployment files
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y caddy shellcheck gnupg
+          shellcheck deploy/install.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh
+          sh scripts/verify-deploy.sh
+          python3 -m unittest discover -s deploy/operations -p 'test_*.py' -v
+      - name: Secret patterns and whitespace
+        run: |
+          python scripts/audit-secrets.py --history
+          git diff --check
+  ios:
+    name: iOS Simulator
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Build and test the existing Xcode project
+        run: sh ios/Scripts/test.sh

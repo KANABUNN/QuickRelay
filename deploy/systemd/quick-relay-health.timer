@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Quick Relay every minute
+
+[Timer]
+OnBootSec=90
+OnUnitActiveSec=60
+AccuracySec=5
+Unit=quick-relay-health.service
+
+[Install]
+WantedBy=timers.target

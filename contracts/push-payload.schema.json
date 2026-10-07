@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quick Relay APNs report notification",
+  "description": "Payload produced by relay.Payload. UTF-8 encoded JSON must be at most 4096 bytes; IDs must agree. These cross-field/byte constraints are checked in Go.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aps",
+    "event_id",
+    "report_id",
+    "eventId",
+    "serial",
+    "kind",
+    "cancel",
+    "final",
+    "warning",
+    "server_sequence"
+  ],
+  "properties": {
+    "aps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alert",
+        "sound",
+        "interruption-level",
+        "thread-id"
+      ],
+      "properties": {
+        "alert": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "body"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 121
+            },
+            "body": {
+              "type": "string",
+              "maxLength": 601
+            }
+          }
+        },
+        "sound": {
+          "enum": [
+            "default",
+            "normal.caf",
+            "quake_update.caf",
+            "quake_warning.caf"
+          ]
+        },
+        "interruption-level": {
+          "enum": [
+            "active",
+            "time-sensitive"
+          ]
+        },
+        "thread-id": {
+          "type": "string"
+        }
+      }
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "report_id": {
+      "type": "string"
+    },
+    "eventId": {
+      "type": "string"
+    },
+    "serial": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "eew.forecast",
+        "eew.warning",
+        "telegram.earthquake"
+      ]
+    },
+    "cancel": {
+      "type": "boolean"
+    },
+    "final": {
+      "type": "boolean"
+    },
+    "warning": {
+      "type": "boolean"
+    },
+    "server_sequence": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

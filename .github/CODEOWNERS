@@ -1,0 +1,6 @@
+# Review authentication, workflows, and signing changes with the owner.
+/.github/ @KANABUNN
+/ios/Scripts/ @KANABUNN
+/server/internal/api/ @KANABUNN
+/server/internal/config/ @KANABUNN
+/deploy/ @KANABUNN

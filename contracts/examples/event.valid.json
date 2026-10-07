@@ -1,0 +1,20 @@
+{
+  "id": "20261005000000",
+  "classification": "eew.forecast",
+  "telegram_type": "VXSE45",
+  "event_type": "eew_forecast",
+  "is_final": false,
+  "is_cancelled": false,
+  "is_warning": false,
+  "origin_time": "2026-10-05T00:00:00Z",
+  "epicenter": "日向灘",
+  "latitude": 31.8,
+  "longitude": 131.7,
+  "depth_km": 30,
+  "magnitude": 5.7,
+  "max_intensity": "5弱",
+  "category": "earthquake",
+  "latest_revision": 1,
+  "source_serial": 1,
+  "latest_report_at": "2026-10-05T00:00:01Z"
+}

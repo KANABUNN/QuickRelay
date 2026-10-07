@@ -1,0 +1,133 @@
+name: QuakeRelay
+
+options:
+  bundleIdPrefix: jp.kb-dev
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    PRODUCT_BUNDLE_IDENTIFIER: jp.kb-dev.quickrelay
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.0.0"
+  configs:
+    Debug:
+      APNS_ENVIRONMENT: development
+    Release:
+      APNS_ENVIRONMENT: production
+
+targets:
+  QuakeRelay:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: QuakeRelay
+        excludes:
+          - Resources
+    resources:
+      - path: QuakeRelay/Resources/Assets.xcassets
+      - path: QuakeRelay/Resources/PrivacyInfo.xcprivacy
+    info:
+      path: QuakeRelay/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Quick Relay
+        ITSAppUsesNonExemptEncryption: false
+        QuakeRelayAPNsEnvironment: $(APNS_ENVIRONMENT)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIBackgroundModes:
+          - remote-notification
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CFBundleURLTypes:
+          - CFBundleURLName: jp.kb-dev.quickrelay.deeplink
+            CFBundleURLSchemes:
+              - quake-relay
+    entitlements:
+      path: QuakeRelay/Resources/QuakeRelay.entitlements
+      properties:
+        aps-environment: $(APNS_ENVIRONMENT)
+        com.apple.developer.usernotifications.time-sensitive: true
+    settings:
+      base:
+        PRODUCT_NAME: QuakeRelay
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: QuakeRelay/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: QuakeRelay/Resources/QuakeRelay.entitlements
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    postBuildScripts:
+      - name: Generate notification sounds
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          /usr/bin/xcrun --sdk macosx swift "${SRCROOT}/Scripts/GenerateNotificationSounds.swift" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/quake_warning.caf
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/quake_update.caf
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/normal.caf
+
+  QuakeRelayTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: QuakeRelayTests
+    dependencies:
+      - target: QuakeRelay
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kb-dev.quickrelay.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/QuakeRelay.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/QuakeRelay
+        BUNDLE_LOADER: $(TEST_HOST)
+
+  QuakeRelayUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: QuakeRelayUITests
+    dependencies:
+      - target: QuakeRelay
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kb-dev.quickrelay.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: QuakeRelay
+
+schemes:
+  QuakeRelay:
+    build:
+      targets:
+        QuakeRelay: all
+        QuakeRelayTests: [test]
+        QuakeRelayUITests: [test]
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: QuakeRelayTests
+          parallelizable: false
+        - name: QuakeRelayUITests
+          parallelizable: false
