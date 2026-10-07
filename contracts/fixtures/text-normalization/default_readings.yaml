@@ -1,0 +1,12 @@
+readings:
+  - surface: "日向灘"
+    spoken: "ひゅうがなだ"
+    priority: 100
+
+  - surface: "豊後水道"
+    spoken: "ぶんごすいどう"
+    priority: 100
+
+  - surface: "薩摩半島西方沖"
+    spoken: "さつまはんとう、せいほうおき"
+    priority: 100

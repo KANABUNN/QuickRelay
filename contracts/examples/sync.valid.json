@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "items": [
+    {
+      "report": {
+        "id": "fixture-report-1",
+        "event_id": "20261005000000",
+        "server_sequence": 1,
+        "message_id": "synthetic-contract-1",
+        "classification": "eew.forecast",
+        "telegram_type": "VXSE45",
+        "event_type": "eew_forecast",
+        "revision": 1,
+        "is_final": false,
+        "is_cancelled": false,
+        "is_warning": false,
+        "title": "緊急地震速報（予報） 第1報",
+        "body": "日向灘で地震。 予想最大震度5弱。 M5.7。",
+        "occurred_at": "2026-10-05T00:00:01Z",
+        "received_at": "2026-10-05T00:00:02Z",
+        "origin_time": "2026-10-05T00:00:00Z",
+        "epicenter": "日向灘",
+        "latitude": 31.8,
+        "longitude": 131.7,
+        "depth_km": 30,
+        "magnitude": 5.7,
+        "max_intensity": "5弱"
+      },
+      "event": {
+        "id": "20261005000000",
+        "classification": "eew.forecast",
+        "telegram_type": "VXSE45",
+        "event_type": "eew_forecast",
+        "is_final": false,
+        "is_cancelled": false,
+        "is_warning": false,
+        "origin_time": "2026-10-05T00:00:00Z",
+        "epicenter": "日向灘",
+        "latitude": 31.8,
+        "longitude": 131.7,
+        "depth_km": 30,
+        "magnitude": 5.7,
+        "max_intensity": "5弱",
+        "category": "earthquake",
+        "latest_revision": 1,
+        "source_serial": 1,
+        "latest_report_at": "2026-10-05T00:00:01Z"
+      }
+    }
+  ],
+  "next_after_sequence": 1,
+  "has_more": false,
+  "latest_committed_sequence": 1,
+  "server_time": "2026-10-05T00:00:03Z"
+}

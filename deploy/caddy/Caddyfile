@@ -1,0 +1,18 @@
+# Adopted hostname. Initially use DNS-only records pointing to the VPS.
+# Allow TCP 80/443 in UFW and the VPS packet filter; keep 8080 on loopback.
+relay.example.com {
+	encode zstd gzip
+	@relay path /api/v1/* /health /healthz /readyz /metrics
+	handle @relay {
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle {
+		respond "Not found" 404
+	}
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+	# Caddy redacts sensitive authentication headers in access logs by default.
+	log
+}

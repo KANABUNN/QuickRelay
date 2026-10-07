@@ -1,0 +1,863 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Quick Relay VPS API",
+    "version": "vps-1",
+    "description": "Existing Go API after repository cleanup. URLs include /api/v1; the server base is the origin."
+  },
+  "servers": [
+    {
+      "url": "https://relay.example.com"
+    }
+  ],
+  "security": [
+    {
+      "deviceBearer": []
+    }
+  ],
+  "paths": {
+    "/api/v1/pair/complete": {
+      "post": {
+        "summary": "Complete CLI-issued pairing",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "device_access_token",
+                    "expires_at"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "device_access_token": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Invalid, expired or exhausted pairing code"
+          },
+          "429": {
+            "description": "Rate limited; Retry-After: 60"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pairing_code",
+                  "installation_id"
+                ],
+                "properties": {
+                  "pairing_code": {
+                    "type": "string"
+                  },
+                  "installation_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/register": {
+      "post": {
+        "summary": "Register or rotate this device APNs token",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "device"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "device": {
+                      "$ref": "#/components/schemas/Device"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "installation_id",
+                  "device_token",
+                  "environment"
+                ],
+                "properties": {
+                  "installation_id": {
+                    "type": "string"
+                  },
+                  "device_token": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "enum": [
+                      "development",
+                      "production",
+                      "sandbox"
+                    ]
+                  },
+                  "app_version": {
+                    "type": "string"
+                  },
+                  "os_version": {
+                    "type": "string"
+                  },
+                  "device_name": {
+                    "type": "string"
+                  },
+                  "preferences": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Preferences"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/me": {
+      "get": {
+        "summary": "Read own device without tokens",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "device"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "device": {
+                      "$ref": "#/components/schemas/Device"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        }
+      },
+      "put": {
+        "summary": "Register or rotate own APNs token",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "device"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "device": {
+                      "$ref": "#/components/schemas/Device"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "installation_id",
+                  "device_token",
+                  "environment"
+                ],
+                "properties": {
+                  "installation_id": {
+                    "type": "string"
+                  },
+                  "device_token": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "enum": [
+                      "development",
+                      "production",
+                      "sandbox"
+                    ]
+                  },
+                  "app_version": {
+                    "type": "string"
+                  },
+                  "os_version": {
+                    "type": "string"
+                  },
+                  "device_name": {
+                    "type": "string"
+                  },
+                  "preferences": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Preferences"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke own API credential and push registration",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        }
+      }
+    },
+    "/api/v1/devices/me/preferences": {
+      "patch": {
+        "summary": "Update selected preference fields",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "preferences"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "preferences": {
+                      "$ref": "#/components/schemas/Preferences"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {
+                  "notifications_enabled": {
+                    "type": "boolean"
+                  },
+                  "time_sensitive_enabled": {
+                    "type": "boolean"
+                  },
+                  "custom_sound_enabled": {
+                    "type": "boolean"
+                  },
+                  "event_types": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "maxItems": 20,
+                    "items": {
+                      "enum": [
+                        "eew_forecast",
+                        "eew_warning",
+                        "eew_cancel",
+                        "earthquake_info",
+                        "earthquake_update",
+                        "system_test"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync": {
+      "get": {
+        "summary": "Page report history with latest event state",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        },
+        "parameters": [
+          {
+            "name": "after_sequence",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "summary": "Page latest events",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "items",
+                    "next_cursor",
+                    "server_time"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "server_time": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/events/{id}": {
+      "get": {
+        "summary": "Read one event and its report history",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "event",
+                    "reports"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "event": {
+                      "$ref": "#/components/schemas/Event"
+                    },
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Report"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "summary": "DMDATA connection and delivery counts",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Prometheus metrics",
+        "responses": {
+          "200": {
+            "description": "Prometheus text exposition",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        }
+      }
+    },
+    "/api/v1/events/current": {
+      "get": {
+        "summary": "Alias of /events; not an active-event filter",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "items",
+                    "next_cursor",
+                    "server_time"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "server_time": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal error"
+          },
+          "401": {
+            "description": "Bearer authentication required"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "Process, DB and configured APNs status",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Healthy / ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable / not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "summary": "Process, DB and configured APNs status",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Healthy / ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable / not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Readiness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Healthy / ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable / not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Process, DB and configured APNs status",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Healthy / ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable / not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "health"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "deviceBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Report": {
+        "$ref": "./api.schema.json#/$defs/Report"
+      },
+      "Event": {
+        "$ref": "./api.schema.json#/$defs/Event"
+      },
+      "Preferences": {
+        "$ref": "./api.schema.json#/$defs/Preferences"
+      },
+      "Device": {
+        "$ref": "./api.schema.json#/$defs/Device"
+      },
+      "SyncPage": {
+        "$ref": "./api.schema.json#/$defs/SyncPage"
+      }
+    }
+  }
+}

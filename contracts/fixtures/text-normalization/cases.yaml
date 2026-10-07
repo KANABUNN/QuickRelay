@@ -1,0 +1,35 @@
+cases:
+  - id: depth_and_magnitude
+    source: "震源の深さは10km、M5.7です"
+    expected: "震源の深さは、10キロメートル。マグニチュード、5.7です。"
+
+  - id: maximum_intensity
+    source: "最大震度 5弱"
+    expected: "最大震度、5弱。"
+
+  - id: report_number
+    source: "第 3 報"
+    expected: "第3報。"
+
+  - id: default_readings
+    source: "日向灘、豊後水道、薩摩半島西方沖"
+    expected: "ひゅうがなだ、ぶんごすいどう、さつまはんとう、せいほうおき。"
+
+  - id: fullwidth_characters
+    source: "Ｍ５．７、深さ０１０ｋｍ"
+    expected: "マグニチュード、5.7。深さ、010キロメートル。"
+
+  - id: blank_line_boundary
+    source: |-
+      第一報
+
+      第二報
+    expected: "第一報。第二報。"
+
+  - id: repeated_punctuation
+    source: "注意、、、。。。継続"
+    expected: "注意。継続。"
+
+  - id: unknown_text_is_unchanged
+    source: "未知地域ABC。"
+    expected: "未知地域ABC。"

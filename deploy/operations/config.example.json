@@ -1,0 +1,22 @@
+{
+  "database": "/var/lib/quick-relay/quickrelay.db",
+  "sources": {
+    "/etc/quick-relay": "config/quick-relay",
+    "/etc/caddy": "config/caddy",
+    "/etc/systemd/system/quick-relay.service": "config/quick-relay.service",
+    "/opt/quick-relay/quakerelay": "bin/quakerelay",
+    "/opt/quick-relay/apns-send": "bin/apns-send"
+  },
+  "public_key": "/etc/quick-relay-ops/recipient.asc",
+  "recipient": "REPLACE_WITH_FULL_GPG_FINGERPRINT",
+  "archives": "/var/backups/quick-relay",
+  "state_dir": "/var/lib/quick-relay-ops",
+  "readiness_url": "http://127.0.0.1:8080/readyz",
+  "disk_path": "/",
+  "port": 9081,
+  "min_free_bytes": 1073741824,
+  "max_backup_age_hours": 30,
+  "retention_days": 14,
+  "require_offsite": true,
+  "offsite_hook": null
+}

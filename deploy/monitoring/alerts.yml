@@ -1,0 +1,29 @@
+groups:
+  - name: quakerelay
+    rules:
+      - alert: QuakeRelaySourceDisconnected
+        expr: quakerelay_dmdata_connected == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "QuakeRelay is disconnected from DMDATA"
+      - alert: QuakeRelayRejectedTelegram
+        expr: increase(quakerelay_dmdata_rejected_total[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "QuakeRelay rejected a telegram; inspect schema and clock"
+      - alert: QuakeRelayDeliveryFailure
+        expr: delta(quakerelay_deliveries{status=~"failed|invalid_token|expired"}[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "QuakeRelay notifications failed, expired, or need token registration"
+      - alert: QuakeRelayUnavailable
+        expr: up{job="quakerelay"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "QuakeRelay metrics endpoint is unavailable"

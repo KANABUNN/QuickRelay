@@ -1,0 +1,639 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 /* QuakeRelayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* QuakeRelayApp.swift */; };
+		A00000000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000002 /* AppDelegate.swift */; };
+		A00000000000000000000003 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* AppEnvironment.swift */; };
+		A00000000000000000000004 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000004 /* AppSettings.swift */; };
+		A00000000000000000000005 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000005 /* APIModels.swift */; };
+		A00000000000000000000006 /* PersistenceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000006 /* PersistenceModels.swift */; };
+		A00000000000000000000007 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000007 /* APIClient.swift */; };
+		A00000000000000000000008 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000008 /* KeychainStore.swift */; };
+		A00000000000000000000009 /* NotificationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000009 /* NotificationCoordinator.swift */; };
+		A0000000000000000000000A /* DeviceRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000A /* DeviceRegistrationCoordinator.swift */; };
+		A0000000000000000000000B /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000B /* PersistenceController.swift */; };
+		A0000000000000000000000C /* EventRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000C /* EventRepository.swift */; };
+		A0000000000000000000000D /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000D /* RootView.swift */; };
+		A0000000000000000000000E /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000E /* PairingView.swift */; };
+		A0000000000000000000000F /* EventListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* EventListView.swift */; };
+		A00000000000000000000010 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000010 /* EventDetailView.swift */; };
+		A00000000000000000000011 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* SettingsView.swift */; };
+		A00000000000000000000012 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* DiagnosticsView.swift */; };
+		A00000000000000000000013 /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* DeepLinkRouter.swift */; };
+		A00000000000000000000014 /* LiveActivityPushTokenRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* LiveActivityPushTokenRegistrar.swift */; };
+		A00000000000000000000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000015 /* Assets.xcassets */; };
+		A00000000000000000000016 /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000020 /* TestFixtures.swift */; };
+		A00000000000000000000017 /* APIDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000021 /* APIDecodingTests.swift */; };
+		A00000000000000000000018 /* EventMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000022 /* EventMergeTests.swift */; };
+		A00000000000000000000019 /* SyncCursorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000023 /* SyncCursorTests.swift */; };
+		A0000000000000000000001A /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000024 /* KeychainStoreTests.swift */; };
+		A0000000000000000000001B /* DeepLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000025 /* DeepLinkTests.swift */; };
+		A0000000000000000000001C /* NotificationPermissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000026 /* NotificationPermissionTests.swift */; };
+		A0000000000000000000001D /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F00000000000000000000030 /* XCTest.framework */; };
+		A0000000000000000000001E /* ReportTimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000027 /* ReportTimelineTests.swift */; };
+		A0000000000000000000001F /* DeviceRegistrationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000028 /* DeviceRegistrationCoordinatorTests.swift */; };
+		A00000000000000000000020 /* ServerAcceptanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000029 /* ServerAcceptanceTests.swift */; };
+		A80000000000000000000001 /* NotificationsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80000000000000000000001 /* NotificationsUITests.swift */; };
+		A80000000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F00000000000000000000030 /* XCTest.framework */; };
+		A90000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F90000000000000000000001 /* PrivacyInfo.xcprivacy */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B00000000000000000000001;
+			remoteInfo = QuakeRelay;
+		};
+		D80000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B00000000000000000000001;
+			remoteInfo = QuakeRelay;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		F00000000000000000000001 /* QuakeRelayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/QuakeRelayApp.swift; sourceTree = "<group>"; };
+		F00000000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegate.swift; sourceTree = "<group>"; };
+		F00000000000000000000003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppEnvironment.swift; sourceTree = "<group>"; };
+		F00000000000000000000004 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppSettings.swift; sourceTree = "<group>"; };
+		F00000000000000000000005 /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/APIModels.swift; sourceTree = "<group>"; };
+		F00000000000000000000006 /* PersistenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/PersistenceModels.swift; sourceTree = "<group>"; };
+		F00000000000000000000007 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Networking/APIClient.swift; sourceTree = "<group>"; };
+		F00000000000000000000008 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Security/KeychainStore.swift; sourceTree = "<group>"; };
+		F00000000000000000000009 /* NotificationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications/NotificationCoordinator.swift; sourceTree = "<group>"; };
+		F0000000000000000000000A /* DeviceRegistrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications/DeviceRegistrationCoordinator.swift; sourceTree = "<group>"; };
+		F0000000000000000000000B /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence/PersistenceController.swift; sourceTree = "<group>"; };
+		F0000000000000000000000C /* EventRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repositories/EventRepository.swift; sourceTree = "<group>"; };
+		F0000000000000000000000D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/RootView.swift; sourceTree = "<group>"; };
+		F0000000000000000000000E /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/PairingView.swift; sourceTree = "<group>"; };
+		F0000000000000000000000F /* EventListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/EventListView.swift; sourceTree = "<group>"; };
+		F00000000000000000000010 /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/EventDetailView.swift; sourceTree = "<group>"; };
+		F00000000000000000000011 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/SettingsView.swift; sourceTree = "<group>"; };
+		F00000000000000000000012 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/DiagnosticsView.swift; sourceTree = "<group>"; };
+		F00000000000000000000013 /* DeepLinkRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLink/DeepLinkRouter.swift; sourceTree = "<group>"; };
+		F00000000000000000000014 /* LiveActivityPushTokenRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Future/LiveActivityPushTokenRegistrar.swift; sourceTree = "<group>"; };
+		F00000000000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		F00000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/Info.plist; sourceTree = "<group>"; };
+		F00000000000000000000017 /* QuakeRelay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Resources/QuakeRelay.entitlements; sourceTree = "<group>"; };
+		F00000000000000000000018 /* GenerateNotificationSounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateNotificationSounds.swift; sourceTree = "<group>"; };
+		F00000000000000000000020 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
+		F00000000000000000000021 /* APIDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIDecodingTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000022 /* EventMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventMergeTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000023 /* SyncCursorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCursorTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000024 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000025 /* DeepLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000026 /* NotificationPermissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPermissionTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000027 /* ReportTimelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportTimelineTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000028 /* DeviceRegistrationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRegistrationCoordinatorTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000030 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		F00000000000000000000031 /* QuakeRelay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuakeRelay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00000000000000000000032 /* QuakeRelayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = QuakeRelayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00000000000000000000029 /* ServerAcceptanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAcceptanceTests.swift; sourceTree = "<group>"; };
+		F80000000000000000000001 /* NotificationsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsUITests.swift; sourceTree = "<group>"; };
+		F80000000000000000000002 /* QuakeRelayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = QuakeRelayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F90000000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E00000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E00000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0000000000000000000001D /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E80000000000000000000001 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A80000000000000000000002 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000004 /* QuakeRelay */,
+				000000000000000000000005 /* QuakeRelayTests */,
+				080000000000000000000001 /* QuakeRelayUITests */,
+				000000000000000000000006 /* Scripts */,
+				000000000000000000000007 /* Frameworks */,
+				000000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000031 /* QuakeRelay.app */,
+				F00000000000000000000032 /* QuakeRelayTests.xctest */,
+				F80000000000000000000002 /* QuakeRelayUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		000000000000000000000004 /* QuakeRelay */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000001 /* QuakeRelayApp.swift */,
+				F00000000000000000000002 /* AppDelegate.swift */,
+				F00000000000000000000003 /* AppEnvironment.swift */,
+				F00000000000000000000004 /* AppSettings.swift */,
+				F00000000000000000000005 /* APIModels.swift */,
+				F00000000000000000000006 /* PersistenceModels.swift */,
+				F00000000000000000000007 /* APIClient.swift */,
+				F00000000000000000000008 /* KeychainStore.swift */,
+				F00000000000000000000009 /* NotificationCoordinator.swift */,
+				F0000000000000000000000A /* DeviceRegistrationCoordinator.swift */,
+				F0000000000000000000000B /* PersistenceController.swift */,
+				F0000000000000000000000C /* EventRepository.swift */,
+				F0000000000000000000000D /* RootView.swift */,
+				F0000000000000000000000E /* PairingView.swift */,
+				F0000000000000000000000F /* EventListView.swift */,
+				F00000000000000000000010 /* EventDetailView.swift */,
+				F00000000000000000000011 /* SettingsView.swift */,
+				F00000000000000000000012 /* DiagnosticsView.swift */,
+				F00000000000000000000013 /* DeepLinkRouter.swift */,
+				F00000000000000000000014 /* LiveActivityPushTokenRegistrar.swift */,
+				F00000000000000000000015 /* Assets.xcassets */,
+				F90000000000000000000001 /* PrivacyInfo.xcprivacy */,
+				F00000000000000000000016 /* Info.plist */,
+				F00000000000000000000017 /* QuakeRelay.entitlements */,
+			);
+			path = QuakeRelay;
+			sourceTree = "<group>";
+		};
+		000000000000000000000005 /* QuakeRelayTests */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000020 /* TestFixtures.swift */,
+				F00000000000000000000021 /* APIDecodingTests.swift */,
+				F00000000000000000000022 /* EventMergeTests.swift */,
+				F00000000000000000000023 /* SyncCursorTests.swift */,
+				F00000000000000000000024 /* KeychainStoreTests.swift */,
+				F00000000000000000000025 /* DeepLinkTests.swift */,
+				F00000000000000000000026 /* NotificationPermissionTests.swift */,
+				F00000000000000000000027 /* ReportTimelineTests.swift */,
+				F00000000000000000000028 /* DeviceRegistrationCoordinatorTests.swift */,
+				F00000000000000000000029 /* ServerAcceptanceTests.swift */,
+			);
+			path = QuakeRelayTests;
+			sourceTree = "<group>";
+		};
+		000000000000000000000006 /* Scripts */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000018 /* GenerateNotificationSounds.swift */,
+			);
+			path = Scripts;
+			sourceTree = "<group>";
+		};
+		000000000000000000000007 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000030 /* XCTest.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		080000000000000000000001 /* QuakeRelayUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F80000000000000000000001 /* NotificationsUITests.swift */,
+			);
+			path = QuakeRelayUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B00000000000000000000001 /* QuakeRelay */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C00000000000000000000002 /* Build configuration list for PBXNativeTarget "QuakeRelay" */;
+			buildPhases = (
+				E00000000000000000000003 /* Sources */,
+				E00000000000000000000001 /* Frameworks */,
+				E00000000000000000000005 /* Resources */,
+				E00000000000000000000007 /* Generate notification sounds */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QuakeRelay;
+			productName = QuakeRelay;
+			productReference = F00000000000000000000031 /* QuakeRelay.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B00000000000000000000002 /* QuakeRelayTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C00000000000000000000003 /* Build configuration list for PBXNativeTarget "QuakeRelayTests" */;
+			buildPhases = (
+				E00000000000000000000004 /* Sources */,
+				E00000000000000000000002 /* Frameworks */,
+				E00000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D00000000000000000000002 /* PBXTargetDependency */,
+			);
+			name = QuakeRelayTests;
+			productName = QuakeRelayTests;
+			productReference = F00000000000000000000032 /* QuakeRelayTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		B80000000000000000000001 /* QuakeRelayUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C80000000000000000000003;
+			buildPhases = (
+				E80000000000000000000002,
+				E80000000000000000000001,
+			);
+			buildRules = ();
+			dependencies = (
+				D80000000000000000000002 /* PBXTargetDependency */,
+			);
+			name = QuakeRelayUITests;
+			productName = QuakeRelayUITests;
+			productReference = F80000000000000000000002 /* QuakeRelayUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					B80000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = B00000000000000000000001;
+					};
+					B00000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					B00000000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = B00000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = C00000000000000000000001 /* Build configuration list for PBXProject "QuakeRelay" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				ja,
+			);
+			mainGroup = 000000000000000000000002;
+			productRefGroup = 000000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B00000000000000000000001 /* QuakeRelay */,
+				B00000000000000000000002 /* QuakeRelayTests */,
+				B80000000000000000000001 /* QuakeRelayUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E00000000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000015 /* Assets.xcassets in Resources */,
+				A90000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E00000000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E00000000000000000000007 /* Generate notification sounds */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Scripts/GenerateNotificationSounds.swift",
+			);
+			name = "Generate notification sounds";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/quake_warning.caf",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/quake_update.caf",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/normal.caf",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n/usr/bin/xcrun --sdk macosx swift \"${SRCROOT}/Scripts/GenerateNotificationSounds.swift\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E00000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000001 /* QuakeRelayApp.swift in Sources */,
+				A00000000000000000000002 /* AppDelegate.swift in Sources */,
+				A00000000000000000000003 /* AppEnvironment.swift in Sources */,
+				A00000000000000000000004 /* AppSettings.swift in Sources */,
+				A00000000000000000000005 /* APIModels.swift in Sources */,
+				A00000000000000000000006 /* PersistenceModels.swift in Sources */,
+				A00000000000000000000007 /* APIClient.swift in Sources */,
+				A00000000000000000000008 /* KeychainStore.swift in Sources */,
+				A00000000000000000000009 /* NotificationCoordinator.swift in Sources */,
+				A0000000000000000000000A /* DeviceRegistrationCoordinator.swift in Sources */,
+				A0000000000000000000000B /* PersistenceController.swift in Sources */,
+				A0000000000000000000000C /* EventRepository.swift in Sources */,
+				A0000000000000000000000D /* RootView.swift in Sources */,
+				A0000000000000000000000E /* PairingView.swift in Sources */,
+				A0000000000000000000000F /* EventListView.swift in Sources */,
+				A00000000000000000000010 /* EventDetailView.swift in Sources */,
+				A00000000000000000000011 /* SettingsView.swift in Sources */,
+				A00000000000000000000012 /* DiagnosticsView.swift in Sources */,
+				A00000000000000000000013 /* DeepLinkRouter.swift in Sources */,
+				A00000000000000000000014 /* LiveActivityPushTokenRegistrar.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E00000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000016 /* TestFixtures.swift in Sources */,
+				A00000000000000000000017 /* APIDecodingTests.swift in Sources */,
+				A00000000000000000000018 /* EventMergeTests.swift in Sources */,
+				A00000000000000000000019 /* SyncCursorTests.swift in Sources */,
+				A0000000000000000000001A /* KeychainStoreTests.swift in Sources */,
+				A0000000000000000000001B /* DeepLinkTests.swift in Sources */,
+				A0000000000000000000001C /* NotificationPermissionTests.swift in Sources */,
+				A0000000000000000000001E /* ReportTimelineTests.swift in Sources */,
+				A0000000000000000000001F /* DeviceRegistrationCoordinatorTests.swift in Sources */,
+				A00000000000000000000020 /* ServerAcceptanceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E80000000000000000000002 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A80000000000000000000001 /* NotificationsUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D00000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B00000000000000000000001 /* QuakeRelay */;
+			targetProxy = D00000000000000000000001 /* PBXContainerItemProxy */;
+		};
+		D80000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B00000000000000000000001 /* QuakeRelay */;
+			targetProxy = D80000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C10000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C10000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C20000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APNS_ENVIRONMENT = development;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = QuakeRelay/Resources/QuakeRelay.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuakeRelay/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kb-dev.quickrelay;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		C20000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APNS_ENVIRONMENT = production;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = QuakeRelay/Resources/QuakeRelay.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuakeRelay/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kb-dev.quickrelay;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		C30000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kb-dev.quickrelay.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/QuakeRelay.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/QuakeRelay";
+			};
+			name = Debug;
+		};
+		C30000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kb-dev.quickrelay.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/QuakeRelay.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/QuakeRelay";
+			};
+			name = Release;
+		};
+		C80000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kb-dev.quickrelay.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = QuakeRelay;
+			};
+			name = Debug;
+		};
+		C80000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kb-dev.quickrelay.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = QuakeRelay;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C00000000000000000000001 /* Build configuration list for PBXProject "QuakeRelay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C10000000000000000000001 /* Debug */,
+				C10000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C00000000000000000000002 /* Build configuration list for PBXNativeTarget "QuakeRelay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C20000000000000000000001 /* Debug */,
+				C20000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C00000000000000000000003 /* Build configuration list for PBXNativeTarget "QuakeRelayTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C30000000000000000000001 /* Debug */,
+				C30000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C80000000000000000000003 /* Build configuration list for QuakeRelayUITests */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C80000000000000000000001 /* Debug */,
+				C80000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000001 /* Project object */;
+}
