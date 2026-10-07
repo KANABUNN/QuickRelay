@@ -94,7 +94,10 @@ struct EventDetailView: View {
     private var forecastReferenceSection: some View {
         Section("同じ地震の予報値（参考）") {
             if let forecast = ForecastReference.latest(eventID: eventID, reports: reports) {
-                LabeledContent("情報の出所", value: "緊急地震速報（予報）")
+                LabeledContent("情報の出所", value: forecast.telegramType == "VXSE45"
+                    ? "緊急地震速報（地震動予報 / VXSE45）"
+                    : forecast.telegramType == "VXSE44"
+                        ? "緊急地震速報（予報 / VXSE44）" : "緊急地震速報（予報）")
                 if let revision = forecast.revision { LabeledContent("予報の報数", value: "第\(revision)報") }
                 LabeledContent("予報の発表時刻", value: (forecast.occurredAt ?? forecast.receivedAt).formatted(date: .abbreviated, time: .standard))
                 if let value = forecast.numericHypocenter {

@@ -218,16 +218,23 @@ enum ReportTimelineOrder {
 }
 
 enum ForecastReference {
-    // Resolve only the VXSE45 stream. Receipt order alone can select a delayed,
-    // older report; cancellation and final reports must remain terminal.
+    // Prefer VXSE45, falling back to VXSE44 only when VXSE45 was never received.
+    // Resolve each source stream separately; their revisions cannot be compared.
     static func latest(eventID: String, reports: [ReportEntity]) -> ReportEntity? {
-        let forecasts = reports.filter {
-            $0.eventId == eventID && ($0.telegramType == "VXSE45" ||
-                $0.classification == "eew.forecast" ||
-                ($0.telegramType == nil && $0.classification == nil && $0.eventType == "eew_forecast"))
-        }.sorted { $0.serverSequence < $1.serverSequence }
+        let candidates = reports.filter { $0.eventId == eventID }
+        let forecasts: [ReportEntity]
+        if candidates.contains(where: { $0.telegramType == "VXSE45" }) {
+            forecasts = candidates.filter { $0.telegramType == "VXSE45" }
+        } else if candidates.contains(where: { $0.telegramType == "VXSE44" }) {
+            forecasts = candidates.filter { $0.telegramType == "VXSE44" }
+        } else {
+            forecasts = candidates.filter {
+                $0.telegramType == nil && ($0.classification == "eew.forecast" ||
+                    ($0.classification == nil && $0.eventType == "eew_forecast"))
+            }
+        }
         var current: ReportEntity?
-        for report in forecasts {
+        for report in forecasts.sorted(by: { $0.serverSequence < $1.serverSequence }) {
             if let old = current {
                 if replaces(report, old) { current = report }
             } else { current = report }

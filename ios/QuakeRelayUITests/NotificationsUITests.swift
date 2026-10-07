@@ -75,7 +75,10 @@ final class NotificationsUITests: XCTestCase {
         let tsunami = app.staticTexts["合成津波警報"].firstMatch
         XCTAssertTrue(tsunami.waitForExistence(timeout: 10))
         tsunami.tap()
-        let height = app.staticTexts["巨大"].firstMatch
+        // LabeledContent exposes the displayed value with its label or accessibility value.
+        let height = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS %@ OR value == %@", "巨大", "巨大")
+        ).firstMatch
         if !height.waitForExistence(timeout: 3) { app.swipeUp() }
         XCTAssertTrue(height.waitForExistence(timeout: 5))
         try await action("capture/tsunami", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)

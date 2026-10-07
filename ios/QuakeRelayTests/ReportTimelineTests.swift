@@ -6,10 +6,10 @@ final class ReportTimelineTests: XCTestCase {
     private func sourceReport(sequence: Int64, revision: Int, type: String = "VXSE45",
                               eventID: String = "event", cancelled: Bool = false, final: Bool = false) -> ReportEntity {
         var dto = ReportDTO(id: "report-\(sequence)", eventId: eventID, serverSequence: UInt64(sequence),
-                            messageId: "message-\(sequence)", eventType: cancelled ? "eew_cancel" : (type == "VXSE45" ? "eew_forecast" : "eew_warning"),
+                            messageId: "message-\(sequence)", eventType: cancelled ? "eew_cancel" : ((type == "VXSE45" || type == "VXSE44") ? "eew_forecast" : "eew_warning"),
                             revision: revision, isFinal: final || cancelled, isCancelled: cancelled, title: "合成テスト", body: "合成データ",
                             occurredAt: "2026-10-07T03:00:00Z", receivedAt: "2026-10-07T03:00:01Z", createdAt: nil)
-        dto.classification = type == "VXSE45" ? "eew.forecast" : "eew.warning"
+        dto.classification = (type == "VXSE45" || type == "VXSE44") ? "eew.forecast" : "eew.warning"
         dto.telegramType = type
         if !cancelled { dto.hypocenter = HypocenterDTO(status: "assumed", depthKm: 10, magnitude: 1) }
         return ReportEntity(dto: dto, serverSequence: sequence)
@@ -26,6 +26,36 @@ final class ReportTimelineTests: XCTestCase {
         XCTAssertEqual(selected?.numericHypocenter?.magnitude, 1)
         XCTAssertTrue(selected?.numericHypocenter?.isAssumed == true)
         XCTAssertEqual(selected?.telegramType, "VXSE45")
+    }
+
+    func testForecastReferenceNeverComparesVXSE44AndVXSE45Revisions() {
+        let preferred = sourceReport(sequence: 2, revision: 3)
+        let oldProduct = sourceReport(sequence: 3, revision: 99, type: "VXSE44")
+        let cancellation = sourceReport(sequence: 4, revision: 99, type: "VXSE44", cancelled: true)
+        XCTAssertEqual(ForecastReference.latest(eventID: "event",
+            reports: [oldProduct, cancellation, preferred])?.id, preferred.id)
+    }
+
+    func testCancelledVXSE45DoesNotFallBackToUncancelledVXSE44() {
+        let reports = [sourceReport(sequence: 1, revision: 3),
+                       sourceReport(sequence: 2, revision: 3, cancelled: true),
+                       sourceReport(sequence: 3, revision: 99, type: "VXSE44")]
+        XCTAssertNil(ForecastReference.latest(eventID: "event", reports: reports))
+    }
+
+    func testVXSE44ReferenceIsAvailableWithoutVXSE45ButRemainsTerminal() {
+        let final = sourceReport(sequence: 2, revision: 3, type: "VXSE44", final: true)
+        let reports = [sourceReport(sequence: 1, revision: 1, type: "VXSE44"), final,
+                       sourceReport(sequence: 3, revision: 4, type: "VXSE44")]
+        XCTAssertEqual(ForecastReference.latest(eventID: "event", reports: reports)?.id, final.id)
+        XCTAssertNil(ForecastReference.latest(eventID: "event", reports: reports +
+            [sourceReport(sequence: 4, revision: 3, type: "VXSE44", cancelled: true)]))
+    }
+
+    func testUnknownForecastProductIsNotUsedAsReference() {
+        let unknown = sourceReport(sequence: 1, revision: 99, type: "VXSE42")
+        unknown.classification = "eew.forecast"
+        XCTAssertNil(ForecastReference.latest(eventID: "event", reports: [unknown]))
     }
 
     func testCancelledForecastCannotReappearAsReference() {
