@@ -9,6 +9,9 @@ final class AppSettings: ObservableObject {
         static let timeSensitiveEnabled = "settings.timeSensitiveEnabled"
         static let customSoundEnabled = "settings.customSoundEnabled"
         static let earthquakeNotificationsEnabled = "settings.earthquakeNotificationsEnabled"
+        static let expandedPreferences = "settings.expandedPreferences.v1"
+        static let tsunamiNotificationsEnabled = "settings.tsunamiNotificationsEnabled"
+        static let advisoryNotificationsEnabled = "settings.advisoryNotificationsEnabled"
         static let eewNotificationsEnabled = "settings.eewNotificationsEnabled"
     }
 
@@ -40,6 +43,15 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(eewNotificationsEnabled, forKey: Key.eewNotificationsEnabled) }
     }
 
+    @Published var tsunamiNotificationsEnabled: Bool {
+        didSet { defaults.set(tsunamiNotificationsEnabled, forKey: Key.tsunamiNotificationsEnabled) }
+    }
+    @Published var advisoryNotificationsEnabled: Bool {
+        didSet { defaults.set(advisoryNotificationsEnabled, forKey: Key.advisoryNotificationsEnabled) }
+    }
+    var needsExpandedPreferences: Bool { !defaults.bool(forKey: Key.expandedPreferences) }
+    func expandedPreferencesSaved() { defaults.set(true, forKey: Key.expandedPreferences) }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         serverBaseURL = defaults.string(forKey: Key.serverBaseURL) ?? Self.placeholderServerURL
@@ -47,6 +59,8 @@ final class AppSettings: ObservableObject {
         timeSensitiveEnabled = defaults.object(forKey: Key.timeSensitiveEnabled) as? Bool ?? true
         customSoundEnabled = defaults.object(forKey: Key.customSoundEnabled) as? Bool ?? true
         earthquakeNotificationsEnabled = defaults.object(forKey: Key.earthquakeNotificationsEnabled) as? Bool ?? true
+        tsunamiNotificationsEnabled = defaults.object(forKey: Key.tsunamiNotificationsEnabled) as? Bool ?? true
+        advisoryNotificationsEnabled = defaults.object(forKey: Key.advisoryNotificationsEnabled) as? Bool ?? true
         eewNotificationsEnabled = defaults.object(forKey: Key.eewNotificationsEnabled) as? Bool ?? true
     }
 
@@ -68,6 +82,8 @@ final class AppSettings: ObservableObject {
         if eewNotificationsEnabled {
             types += [.eewForecast, .eewWarning, .eewCancel]
         }
+        if tsunamiNotificationsEnabled { types += [.tsunamiWarning, .tsunamiInfo] }
+        if advisoryNotificationsEnabled { types += [.nankaiInfo, .seismicAdvisory, .earthquakeData] }
         return types.map(\.rawValue)
     }
 
@@ -76,6 +92,10 @@ final class AppSettings: ObservableObject {
         timeSensitiveEnabled = preferences.timeSensitiveEnabled
         customSoundEnabled = preferences.customSoundEnabled
         let types = Set(preferences.eventTypes)
+        if !needsExpandedPreferences {
+            tsunamiNotificationsEnabled = !types.isDisjoint(with: ["tsunami_warning", "tsunami_info"])
+            advisoryNotificationsEnabled = !types.isDisjoint(with: ["nankai_info", "seismic_advisory", "earthquake_data"])
+        }
         earthquakeNotificationsEnabled = !types.isDisjoint(with: [
             RelayEventType.earthquakeInfo.rawValue,
             RelayEventType.earthquakeUpdate.rawValue

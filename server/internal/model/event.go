@@ -44,6 +44,11 @@ type Report struct {
 	Magnitude      *float64        `json:"magnitude"`
 	MaxIntensity   *string         `json:"max_intensity"`
 	Hypocenter     *Hypocenter     `json:"hypocenter,omitempty"`
+	Category       string          `json:"category,omitempty"`
+	SourceEventID  string          `json:"source_event_id,omitempty"`
+	InfoType       string          `json:"info_type,omitempty"`
+	PressedAt      *time.Time      `json:"press_time,omitempty"`
+	Bulletin       *Bulletin       `json:"bulletin,omitempty"`
 	Raw            json.RawMessage `json:"-"`
 }
 
@@ -57,6 +62,29 @@ func (r Report) TTL() time.Duration {
 	return 10 * time.Minute
 }
 func (r Report) NewerThan(p Report) bool {
+	if !r.IsEEW() {
+		// Ordinary bulletins are publications, not EEW report-number streams.
+		// A later publication can follow a withdrawal; cancellation is not an all-clear.
+		if !r.ReportedAt.Equal(p.ReportedAt) {
+			return r.ReportedAt.After(p.ReportedAt)
+		}
+		if r.PressedAt != nil && p.PressedAt != nil && !r.PressedAt.Equal(*p.PressedAt) {
+			return r.PressedAt.After(*p.PressedAt)
+		}
+		if r.Cancelled != p.Cancelled {
+			return r.Cancelled
+		}
+		if r.InfoType != p.InfoType && r.InfoType == "訂正" {
+			return true
+		}
+		if r.Bulletin != nil && p.Bulletin != nil && r.Bulletin.Document != nil && p.Bulletin.Document != nil {
+			a, b := r.Bulletin.Document.Part, p.Bulletin.Document.Part
+			if a != nil && b != nil {
+				return *a > *b
+			}
+		}
+		return false
+	}
 	if r.Serial != nil && p.Serial != nil {
 		if *r.Serial != *p.Serial {
 			return *r.Serial > *p.Serial && !(p.IsEEW() && (p.Cancelled || p.Final && !r.Cancelled))
@@ -80,6 +108,8 @@ func (r Report) NewerThan(p Report) bool {
 
 type Event struct {
 	ID           string      `json:"id"`
+	Title        string      `json:"title,omitempty"`
+	InfoType     string      `json:"info_type,omitempty"`
 	Category     string      `json:"category"`
 	EventType    string      `json:"event_type"`
 	OriginTime   *string     `json:"origin_time"`
@@ -102,7 +132,7 @@ type Event struct {
 }
 
 func (r Report) Event() Event {
-	return Event{ID: r.EventID, Category: "earthquake", EventType: r.EventType, OriginTime: r.OriginTime,
+	return Event{ID: r.EventID, Category: r.CategoryName(), Title: r.Title, InfoType: r.InfoType, EventType: r.EventType, OriginTime: r.OriginTime,
 		Epicenter: r.Epicenter, Latitude: r.Latitude, Longitude: r.Longitude, DepthKM: r.DepthKM, Magnitude: r.Magnitude,
 		MaxIntensity: r.MaxIntensity, Hypocenter: r.Hypocenter, LatestRevision: r.ServerSequence, SourceSerial: r.Serial, Classification: r.Classification,
 		TelegramType: r.TelegramType, Final: r.Final, Cancelled: r.Cancelled, Warning: r.Warning, LatestReportAt: r.ReportedAt}

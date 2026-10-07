@@ -30,8 +30,11 @@ type Envelope struct {
 	ID             string `json:"id"`
 	Classification string `json:"classification"`
 	Head           struct {
-		Type string `json:"type"`
-		Test bool   `json:"test"`
+		Time        time.Time `json:"time"`
+		Author      string    `json:"author"`
+		Designation string    `json:"designation"`
+		Type        string    `json:"type"`
+		Test        bool      `json:"test"`
 	} `json:"head"`
 	Format      string `json:"format"`
 	Encoding    string `json:"encoding"`
@@ -47,6 +50,7 @@ type converted struct {
 		Type    string `json:"type"`
 		Version string `json:"version"`
 	} `json:"_schema"`
+	PressedAt  *time.Time      `json:"pressDateTime"`
 	EventID    string          `json:"eventId"`
 	Serial     json.RawMessage `json:"serialNo"`
 	Status     string          `json:"status"`
@@ -172,43 +176,37 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 	if err := json.Unmarshal(raw, &e); err != nil {
 		return r, errors.New("invalid envelope JSON")
 	}
-	expected := ""
-	switch e.Head.Type {
-	case "VXSE45":
-		expected = "eew.forecast"
-	case "VXSE43":
-		expected = "eew.warning"
-	case "VXSE51", "VXSE52", "VXSE53":
-		expected = "telegram.earthquake"
-	default:
+	p, supported := products[e.Head.Type]
+	if !supported {
 		return r, ErrIgnored
 	}
+	expected := p.classification
 	if e.Type != "data" || e.Head.Test || e.Classification != expected {
 		return r, ErrIgnored
-	}
-	if e.Format != "json" {
-		return r, errors.New("expected formatMode=json")
 	}
 	body, err := DecodeBody(e)
 	if err != nil {
 		return r, err
 	}
+	if e.Format != "json" {
+		return normalizeDocument(e, body, raw, now, p)
+	}
 	var c converted
 	if err = json.Unmarshal(body, &c); err != nil {
 		return r, errors.New("invalid converted JSON")
 	}
-	schema := "earthquake-information"
-	if strings.HasPrefix(expected, "eew.") {
-		schema = "eew-information"
-	}
+	schema := p.schema
 	if c.Schema.Type != schema || !strings.HasPrefix(c.Schema.Version, "1.") {
 		return r, errors.New("unsupported schema")
 	}
 	if c.Status != "通常" {
 		return r, ErrIgnored
 	}
-	if c.EventID == "" || len(c.EventID) > 64 || strings.Trim(c.EventID, "0123456789") != "" || c.ReportedAt.IsZero() || e.ID == "" || len(e.ID) > 128 {
+	if len(c.EventID) > 512 || c.ReportedAt.IsZero() || e.ID == "" || len(e.ID) > 128 {
 		return r, errors.New("missing telegram identity or time")
+	}
+	if (p.category == "earthquake") && (c.EventID == "" || len(c.EventID) > 64 || strings.Trim(c.EventID, "0123456789") != "") {
+		return r, errors.New("invalid earthquake event identity")
 	}
 	if c.ReportedAt.After(now.Add(30 * time.Second)) {
 		return r, errors.New("telegram time is in the future; check clock")
@@ -236,7 +234,11 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 	}
 	digest := sha256.Sum256([]byte(e.ID))
 	r.ID = hex.EncodeToString(digest[:])
-	r.EventID = c.EventID
+	r.SourceEventID = c.EventID
+	r.Category = p.category
+	r.EventID = bulletinEventID(p, e.Head.Type, c.EventID, e.ID)
+	r.InfoType = c.InfoType
+	r.PressedAt = c.PressedAt
 	r.MessageID = e.ID
 	r.Classification = expected
 	r.TelegramType = e.Head.Type
@@ -244,27 +246,39 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 	r.ReceivedAt = now.UTC()
 	r.Raw = append([]byte(nil), raw...)
 	r.Cancelled = c.Body.Cancelled || c.InfoType == "取消"
-	r.Final = c.Body.Final || r.Cancelled
-	r.Warning = c.Body.Warning || expected == "eew.warning"
-	r.EventType = "earthquake_info"
-	r.Title = map[string]string{"VXSE51": "震度速報", "VXSE52": "震源情報", "VXSE53": "震源・震度情報"}[e.Head.Type]
-	if expected == "eew.forecast" {
-		r.EventType = "eew_forecast"
-		r.Title = "緊急地震速報（予報）"
-	}
-	if expected == "eew.warning" {
-		r.EventType = "eew_warning"
-		r.Title = "緊急地震速報（警報）"
+	r.Final = r.IsEEW() && (c.Body.Final || r.Cancelled)
+	r.Warning = r.IsEEW() && (c.Body.Warning || expected == "eew.warning")
+	r.EventType, r.Title = p.eventType, p.title
+	if !r.IsEEW() {
+		if c.Title != "" && e.Head.Type != "VXSE51" && e.Head.Type != "VXSE52" && e.Head.Type != "VXSE53" {
+			r.Title = c.Title
+		}
+		r.Bulletin = describeBulletin(e, body, c.Headline)
+		if e.Head.Type == "VTSE41" && tsunamiAlert(body) {
+			r.EventType, r.Warning = "tsunami_warning", true
+		}
+		if e.Head.Type == "VYSE50" {
+			r.Warning = nankaiAlert(body)
+		}
 	}
 	if r.Cancelled {
 		if r.IsEEW() {
 			r.EventType = "eew_cancel"
 			r.Title = "緊急地震速報（取消）"
 		} else {
-			r.Title = "地震情報（取消）"
+			if !strings.Contains(r.Title, "取消") {
+				r.Title += "（取消）"
+			}
 		}
 		r.Body = "この情報は取り消されました。"
+		if c.Body.Text != "" {
+			r.Body += " " + c.Body.Text
+		}
+		r.Warning = false
 		return r, nil
+	}
+	if !r.IsEEW() && c.InfoType == "訂正" && !strings.Contains(r.Title, "訂正") {
+		r.Title += "（訂正）"
 	}
 	if r.IsEEW() && r.Serial != nil {
 		r.Title += fmt.Sprintf(" 第%d報", *r.Serial)
@@ -388,5 +402,10 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 		parts = append(parts, "地震情報が発表されました。")
 	}
 	r.Body = strings.Join(parts, " ")
+	if !r.IsEEW() && r.Bulletin != nil {
+		if r.CategoryName() != "earthquake" || len(parts) == 0 {
+			r.Body = bulletinSummary(r.Bulletin, r.Title+"が発表されました。")
+		}
+	}
 	return r, nil
 }

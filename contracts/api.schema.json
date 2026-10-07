@@ -130,6 +130,26 @@
         },
         "hypocenter": {
           "$ref": "#/$defs/Hypocenter"
+        },
+        "category": {
+          "enum": [
+            "earthquake",
+            "tsunami",
+            "advisory"
+          ]
+        },
+        "source_event_id": {
+          "type": "string"
+        },
+        "info_type": {
+          "type": "string"
+        },
+        "press_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bulletin": {
+          "$ref": "#/$defs/Bulletin"
         }
       }
     },
@@ -161,7 +181,11 @@
           "type": "string"
         },
         "category": {
-          "const": "earthquake"
+          "enum": [
+            "earthquake",
+            "tsunami",
+            "advisory"
+          ]
         },
         "event_type": {
           "type": "string"
@@ -243,6 +267,12 @@
         },
         "hypocenter": {
           "$ref": "#/$defs/Hypocenter"
+        },
+        "title": {
+          "type": "string"
+        },
+        "info_type": {
+          "type": "string"
         }
       }
     },
@@ -278,7 +308,12 @@
               "eew_cancel",
               "earthquake_info",
               "earthquake_update",
-              "system_test"
+              "system_test",
+              "tsunami_warning",
+              "tsunami_info",
+              "nankai_info",
+              "seismic_advisory",
+              "earthquake_data"
             ]
           }
         }
@@ -440,6 +475,95 @@
             "number",
             "null"
           ]
+        }
+      }
+    },
+    "Bulletin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "headline": {
+          "type": "string"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BulletinSection"
+          }
+        },
+        "document": {
+          "$ref": "#/$defs/SourceDocument"
+        }
+      }
+    },
+    "BulletinSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "value"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "SourceDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "byte_count",
+        "sha256",
+        "complete"
+      ],
+      "properties": {
+        "format": {
+          "enum": [
+            "json",
+            "a/n",
+            "binary"
+          ]
+        },
+        "byte_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "designation": {
+          "type": "string"
+        },
+        "part": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "type": "boolean"
         }
       }
     }

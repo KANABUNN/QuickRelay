@@ -35,6 +35,28 @@ private struct MainTabView: View {
             }
             .tag(AppTab.events)
 
+            NavigationStack(path: $router.tsunamiPath) {
+                EventListView(category: "tsunami")
+                    .navigationDestination(for: AppRoute.self) { route in
+                        switch route {
+                        case let .event(id, reportID): EventDetailView(eventID: id, highlightedReportID: reportID)
+                        }
+                    }
+            }
+            .tabItem { Label("津波", systemImage: "water.waves") }
+            .tag(AppTab.tsunami)
+
+            NavigationStack(path: $router.advisoryPath) {
+                EventListView(category: "advisory")
+                    .navigationDestination(for: AppRoute.self) { route in
+                        switch route {
+                        case let .event(id, reportID): EventDetailView(eventID: id, highlightedReportID: reportID)
+                        }
+                    }
+            }
+            .tabItem { Label("関連情報", systemImage: "doc.text") }
+            .tag(AppTab.advisory)
+
             NavigationStack {
                 SettingsView()
             }

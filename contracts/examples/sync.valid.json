@@ -44,7 +44,8 @@
         "category": "earthquake",
         "latest_revision": 1,
         "source_serial": 1,
-        "latest_report_at": "2026-10-05T00:00:01Z"
+        "latest_report_at": "2026-10-05T00:00:01Z",
+        "title": "緊急地震速報（予報） 第1報"
       }
     }
   ],

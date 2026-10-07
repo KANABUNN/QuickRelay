@@ -24,6 +24,11 @@ struct SettingsView: View {
                 Toggle("緊急地震速報", isOn: $settings.eewNotificationsEnabled)
                     .disabled(!settings.notificationsEnabled)
 
+                Toggle("津波情報", isOn: $settings.tsunamiNotificationsEnabled)
+                    .disabled(!settings.notificationsEnabled)
+                Toggle("南海トラフ・地震関連情報", isOn: $settings.advisoryNotificationsEnabled)
+                    .disabled(!settings.notificationsEnabled)
+
                 Button {
                     Task {
                         let success = await environment.savePreferences()

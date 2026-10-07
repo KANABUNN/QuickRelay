@@ -99,6 +99,13 @@
     "server_sequence": {
       "type": "integer",
       "minimum": 1
+    },
+    "category": {
+      "enum": [
+        "earthquake",
+        "tsunami",
+        "advisory"
+      ]
     }
   }
 }

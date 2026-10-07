@@ -2,19 +2,24 @@ import SwiftData
 import SwiftUI
 
 struct EventListView: View {
+    var category = "earthquake"
+    private var title: String {
+        switch category { case "tsunami": "津波"; case "advisory": "関連情報"; default: "地震" }
+    }
+    private var categoryEvents: [EventEntity] { events.filter { $0.category == category } }
     @EnvironmentObject private var repository: EventRepository
     @Query(sort: \EventEntity.latestReportAt, order: .reverse) private var events: [EventEntity]
 
     var body: some View {
         Group {
-            if events.isEmpty {
+            if categoryEvents.isEmpty {
                 ContentUnavailableView(
-                    "地震情報はありません",
+                    "\(title)の受信履歴はありません",
                     systemImage: "waveform.path.ecg",
                     description: Text("下へ引いてサーバーと同期できます。")
                 )
             } else {
-                List(events) { event in
+                List(categoryEvents) { event in
                     NavigationLink(value: AppRoute.event(id: event.id, reportID: nil)) {
                         EventRow(event: event)
                     }
@@ -22,7 +27,7 @@ struct EventListView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("地震情報")
+        .navigationTitle(title)
         .safeAreaInset(edge: .bottom) {
             if let error = repository.lastError {
                 Text(error)
@@ -57,13 +62,13 @@ private struct EventRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(event.numericHypocenter.epicenter ?? "震源不明")
+                Text(event.category == "earthquake" ? (event.numericHypocenter.epicenter ?? event.displayTitle) : event.displayTitle)
                     .font(.headline)
                 if event.numericHypocenter.isAssumed {
                     StatusBadge(text: "仮定震源", color: .orange)
                 }
                 Spacer()
-                Text(event.latestReportAt, format: .dateTime.hour().minute())
+                Text(event.latestReportAt, format: .dateTime.month().day().hour().minute())
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -83,13 +88,11 @@ private struct EventRow: View {
             }
 
             HStack(spacing: 8) {
-                Text(RelayEventType(rawValue: event.eventType)?.displayName ?? event.eventType)
-                if let revision = event.sourceSerial {
-                    Text("第\(revision)報")
-                }
+                Text(event.isEEW ? (RelayEventType(rawValue: event.eventType)?.displayName ?? event.displayTitle) : event.displayTitle)
+                Text(event.publicationLabel)
                 if event.isCancelled {
                     StatusBadge(text: "取消", color: .orange)
-                } else if event.isFinal {
+                } else if event.isEEW && event.isFinal {
                     StatusBadge(text: "最終", color: .blue)
                 }
             }

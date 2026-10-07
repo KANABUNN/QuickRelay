@@ -115,11 +115,10 @@ final class AppEnvironment: ObservableObject {
             startupError = error.localizedDescription
         }
 
+        // Resolve existing settings and the one-time category expansion before APNs registration.
+        if isPaired { await refreshRemotePreferences() }
         await notifications.configureAndRegisterForRemoteNotifications()
-        if isPaired {
-            await refreshRemotePreferences()
-            _ = await repository.syncAll()
-        }
+        if isPaired { _ = await repository.syncAll() }
     }
 
     func pair(code: String) async -> Bool {
@@ -189,6 +188,7 @@ final class AppEnvironment: ObservableObject {
         defer { isSavingPreferences = false }
         do {
             _ = try await api.updatePreferences(settings.devicePreferences)
+            settings.expandedPreferencesSaved()
             return true
         } catch {
             diagnosticsError = error.localizedDescription
@@ -210,6 +210,10 @@ final class AppEnvironment: ObservableObject {
         do {
             let response = try await api.currentDevice()
             settings.apply(response.device.preferences)
+            if settings.needsExpandedPreferences {
+                _ = try await api.updatePreferences(settings.devicePreferences)
+                settings.expandedPreferencesSaved()
+            }
         } catch {
             // Registration and history sync remain useful during a temporary
             // preferences read failure; expose it only through diagnostics.

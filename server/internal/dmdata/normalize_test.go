@@ -43,7 +43,7 @@ func TestOfficialEnvelopeAndNormalization(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if r.EventID != "20261005120000" || *r.Serial != 3 || !r.Final {
+			if r.EventID != "20261005120000" || *r.Serial != 3 || r.Final != r.IsEEW() {
 				t.Fatal(r)
 			}
 			if code == "VXSE43" && (r.Magnitude != nil || r.DepthKM != nil || strings.Contains(r.Body, "6.3")) {

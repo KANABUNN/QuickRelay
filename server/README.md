@@ -66,7 +66,7 @@ Apple DeveloperでPush Notifications対応App IDとAPNs用.p8鍵を用意しま�
 - 必要scope: `socket.start`, `socket.close`, `eew.get.forecast`, `eew.get.warning`, `telegram.get.earthquake`。
 - `DMDATA_CLASSIFICATIONS` へ契約済み区分をカンマ区切りで指定します。既定は3区分です。scopeだけでは購読できません。
 - APIキーは `DMDATA_API_KEY`、旧 `DMDATA_TOKEN` も対応。appNameは `Quick Relay` です。
-- 受信対象は `VXSE45`（予報）、`VXSE43`（警報）、`VXSE51/52/53`（震度速報・震源・震源震度情報）。`telegram.earthquake` の全電文を処理するものではなく、津波・南海トラフ・長周期地震動等の専用電文は取得・保存・通知しません。[初回リリース範囲](../docs/initial-release-scope.md)に従い、今回それらの対応を追加しません。
+- 契約済み3区分の20種を処理します。[受信対象と表示](../docs/earthquake-tsunami-products.md)を参照。JSON以外の2種は原文を保存し、試験識別の制約から通知しません。
 
 `POST /v2/socket` に `formatMode=json` と `test=no` を指定し、返されたwss URLへ `dmdata.v2` で接続します。JSON pingへのpong、100秒の無通信監視、指数バックオフ＋jitter、再接続時の新規ticket、終了時の自分のsocketのcloseに対応します。他のアプリのsocketは閉じません。
 

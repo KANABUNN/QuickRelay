@@ -39,10 +39,10 @@ type Client struct {
 
 type socketRequest struct {
 	Classifications []string `json:"classifications"`
-	Types           []string `json:"types"`
+	Types           []string `json:"types,omitempty"`
 	Test            string   `json:"test"`
 	AppName         string   `json:"appName"`
-	FormatMode      string   `json:"formatMode"`
+	Formats         []string `json:"formats"`
 }
 
 func New(token, authMode string) (*Client, error) {
@@ -52,18 +52,17 @@ func NewWithClassifications(token, authMode string, classifications []string) (*
 	if classifications == nil {
 		classifications = []string{"eew.forecast", "eew.warning", "telegram.earthquake"}
 	}
-	request := socketRequest{Test: "no", AppName: "Quick Relay", FormatMode: "json"}
-	supported := map[string][]string{"eew.forecast": {"VXSE45"}, "eew.warning": {"VXSE43"}, "telegram.earthquake": {"VXSE51", "VXSE52", "VXSE53"}}
+	request := socketRequest{Test: "no", AppName: "Quick Relay", Formats: []string{"json", "a/n", "binary"}}
+	supported := map[string]bool{"eew.forecast": true, "eew.warning": true, "telegram.earthquake": true}
 	seen := make(map[string]bool)
 	for _, value := range classifications {
 		name := strings.TrimSpace(value)
-		types, ok := supported[name]
+		_, ok := supported[name]
 		if !ok || seen[name] {
 			return nil, errors.New("DMDATA_CLASSIFICATIONS contains an unsupported or duplicate classification")
 		}
 		seen[name] = true
 		request.Classifications = append(request.Classifications, name)
-		request.Types = append(request.Types, types...)
 	}
 	if len(request.Classifications) == 0 {
 		return nil, errors.New("DMDATA_CLASSIFICATIONS must not be empty")

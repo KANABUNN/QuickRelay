@@ -6,6 +6,11 @@ enum RelayEventType: String, Codable, CaseIterable, Identifiable, Sendable {
     case eewWarning = "eew_warning"
     case eewCancel = "eew_cancel"
     case earthquakeUpdate = "earthquake_update"
+    case tsunamiWarning = "tsunami_warning"
+    case tsunamiInfo = "tsunami_info"
+    case nankaiInfo = "nankai_info"
+    case seismicAdvisory = "seismic_advisory"
+    case earthquakeData = "earthquake_data"
     case systemTest = "system_test"
 
     var id: String { rawValue }
@@ -17,6 +22,11 @@ enum RelayEventType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .eewWarning: "緊急地震速報（警報）"
         case .eewCancel: "緊急地震速報（取消）"
         case .earthquakeUpdate: "地震情報（更新）"
+        case .tsunamiWarning: "津波警報・注意報"
+        case .tsunamiInfo: "津波情報"
+        case .nankaiInfo: "南海トラフ情報"
+        case .seismicAdvisory: "地震関連情報"
+        case .earthquakeData: "推計震度分布データ"
         case .systemTest: "システムテスト"
         }
     }
@@ -72,6 +82,8 @@ struct EventDTO: Codable, Equatable, Sendable {
     let isFinal: Bool
     let isCancelled: Bool
     let latestReportAt: String?
+    var title: String? = nil
+    var infoType: String? = nil
     // latestRevision is the server state version, not a DMDATA report number.
     var sourceSerial: Int? = nil
     var classification: String? = nil
@@ -105,6 +117,10 @@ struct ReportDTO: Codable, Equatable, Sendable {
     var magnitude: Double? = nil
     var maxIntensity: String? = nil
     var isWarning: Bool? = nil
+
+    var category: String? = nil
+    var infoType: String? = nil
+    var bulletin: BulletinDTO? = nil
 
     var numericHypocenter: HypocenterDTO? {
         if let hypocenter { return hypocenter }
@@ -258,5 +274,38 @@ extension JSONEncoder {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return encoder
+    }
+}
+
+struct BulletinDTO: Codable, Equatable, Sendable {
+    var headline: String?
+    var sections: [BulletinSectionDTO]?
+    var document: SourceDocumentDTO?
+}
+struct BulletinSectionDTO: Codable, Equatable, Sendable {
+    var title: String
+    var text: String?
+    var rows: [BulletinRowDTO]?
+}
+struct BulletinRowDTO: Codable, Equatable, Sendable {
+    var label: String
+    var value: String
+}
+struct SourceDocumentDTO: Codable, Equatable, Sendable {
+    var format: String
+    var byteCount: Int
+    var sha256: String
+    var designation: String?
+    var part: Int?
+    var complete: Bool
+    var fileExtension: String {
+        switch format { case "json": "json"; case "a/n": "txt"; default: "bufr" }
+    }
+}
+enum PublicationLabel {
+    static func text(eventType: String, serial: Int?, infoType: String?, cancelled: Bool) -> String {
+        if RelayEventType(rawValue: eventType)?.isEEW == true, let serial { return "第\(serial)報" }
+        if cancelled { return "取消" }
+        return infoType ?? "発表"
     }
 }

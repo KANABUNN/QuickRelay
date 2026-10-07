@@ -833,6 +833,52 @@
         },
         "operationId": "health"
       }
+    },
+    "/api/v1/reports/{id}/source": {
+      "get": {
+        "summary": "Download one original non-EEW document or BUFR fragment",
+        "description": "Requires device authentication. EEW source documents are deliberately unavailable. Binary fragments are not implicitly assembled.",
+        "security": [
+          {
+            "deviceBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original decoded bytes, with attachment filename and no-store",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Source document unavailable"
+          }
+        }
+      }
     }
   },
   "components": {

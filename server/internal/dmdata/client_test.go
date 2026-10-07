@@ -26,7 +26,7 @@ func TestSocketStartPingPongFreshTicketAndCleanup(t *testing.T) {
 			}
 			var body map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&body)
-			if body["formatMode"] != "json" || body["test"] != "no" || body["appName"] != "Quick Relay" {
+			if body["formatMode"] != nil || body["types"] != nil || !reflect.DeepEqual(body["formats"], []any{"json", "a/n", "binary"}) || body["test"] != "no" || body["appName"] != "Quick Relay" {
 				t.Error("bad start options")
 			}
 			starts.Add(1)
@@ -123,9 +123,9 @@ func TestSubscriptionMatchesConfiguredContracts(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
 			t.Error(err)
 		}
-		if got.Test != "no" || got.FormatMode != "json" || got.AppName != "Quick Relay" ||
+		if got.Test != "no" || !reflect.DeepEqual(got.Formats, []string{"json", "a/n", "binary"}) || got.AppName != "Quick Relay" ||
 			!reflect.DeepEqual(got.Classifications, []string{"eew.warning", "telegram.earthquake"}) ||
-			!reflect.DeepEqual(got.Types, []string{"VXSE43", "VXSE51", "VXSE52", "VXSE53"}) {
+			len(got.Types) != 0 {
 			t.Error("subscription does not match configured contracts")
 		}
 		_, _ = w.Write([]byte(`{"status":"ok","websocket":{"id":1,"url":"wss://ws.api.dmdata.jp/v2/websocket?ticket=test"}}`))
