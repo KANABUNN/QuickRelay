@@ -187,6 +187,10 @@ final class EventRepository: ObservableObject {
         reloadCursorState()
     }
 
+    func sourceDocument(reportID: String) async throws -> Data {
+        try await api.sourceDocument(reportID: reportID)
+    }
+
     func reloadCursorState() {
         do {
             let cursor = try SyncPageApplier.fetchOrCreateCursor(in: context)

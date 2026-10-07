@@ -82,3 +82,6 @@ APNsはbest effortです。DMDATA切断中の履歴の自動補完はVPS側に�
 Bundle IDを変えたため旧雛形IDのアプリとは別アプリです。新IDでインストールしてペアリングし直してください。Keychain serviceも `jp.kb-dev.quickrelay.credentials` に統一しています。
 
 XcodeのSWIFT_VERSIONはコンパイラのリリース番号ではなく言語モードなので、既存の5.9指定を5.0へ修正しています。Swift 5モードでiOS 17以降のSDKを使用します。CIは既存projectを使い、利用可能なiPhone SimulatorでビルドとXCTestを実行します。
+
+
+地震・津波・関連情報の3タブと通知設定に対応します。通常情報は発表区分、EEWだけ報番号を表示します。[受信対象と表示](../docs/earthquake-tsunami-products.md)を参照してください。

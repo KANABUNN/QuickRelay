@@ -161,6 +161,23 @@ final class APIClient {
         authentication: Authentication,
         serverBaseURL: String? = nil
     ) async throws -> Response {
+        let data = try await requestData(path: path, method: method, queryItems: queryItems, body: body,
+                                         authentication: authentication, serverBaseURL: serverBaseURL)
+        do { return try decoder.decode(Response.self, from: data) }
+        catch { throw APIClientError.decoding(String(describing: error)) }
+    }
+
+    func sourceDocument(reportID: String) async throws -> Data {
+        guard !reportID.isEmpty, reportID.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
+            throw APIClientError.invalidResponse
+        }
+        return try await requestData(path: "reports/\(reportID)/source", authentication: .device)
+    }
+
+    private func requestData(
+        path: String, method: String = "GET", queryItems: [URLQueryItem] = [], body: Data? = nil,
+        authentication: Authentication, serverBaseURL: String? = nil
+    ) async throws -> Data {
         var request = try makeRequest(
             path: path,
             queryItems: queryItems,
@@ -218,11 +235,7 @@ final class APIClient {
             )
         }
 
-        do {
-            return try decoder.decode(Response.self, from: data)
-        } catch {
-            throw APIClientError.decoding(String(describing: error))
-        }
+        return data
     }
 
     private func makeRequest(

@@ -182,7 +182,7 @@ func ValidatePreferences(p model.Preferences) error {
 	if len(p.EventTypes) > 20 {
 		return ErrInvalid
 	}
-	allowed := map[string]bool{"eew_forecast": true, "eew_warning": true, "eew_cancel": true, "earthquake_info": true, "earthquake_update": true, "system_test": true}
+	allowed := map[string]bool{"eew_forecast": true, "eew_warning": true, "eew_cancel": true, "earthquake_info": true, "earthquake_update": true, "system_test": true, "tsunami_warning": true, "tsunami_info": true, "nankai_info": true, "seismic_advisory": true, "earthquake_data": true}
 	for _, typ := range p.EventTypes {
 		if !allowed[typ] {
 			return ErrInvalid

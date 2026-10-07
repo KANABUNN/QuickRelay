@@ -28,12 +28,12 @@ type Worker struct {
 func Payload(r model.Report, p model.Preferences) ([]byte, error) {
 	level := "active"
 	sound := "default"
-	if r.IsEEW() && p.TimeSensitiveEnabled {
+	if r.Attention() && p.TimeSensitiveEnabled {
 		level = "time-sensitive"
 	}
 	if p.CustomSoundEnabled {
 		sound = "normal.caf"
-		if r.IsEEW() {
+		if r.Attention() {
 			sound = "quake_update.caf"
 			if r.Warning || r.Cancelled {
 				sound = "quake_warning.caf"
@@ -51,7 +51,7 @@ func Payload(r model.Report, p model.Preferences) ([]byte, error) {
 	payload := map[string]any{
 		"aps": map[string]any{"alert": map[string]string{"title": trim(r.Title, 120), "body": trim(r.Body, 600)},
 			"sound": sound, "interruption-level": level, "thread-id": r.EventID},
-		"event_id": r.EventID, "report_id": r.ID, "server_sequence": r.ServerSequence, "eventId": r.EventID, "serial": r.Serial, "kind": r.Classification,
+		"category": r.CategoryName(), "event_id": r.EventID, "report_id": r.ID, "server_sequence": r.ServerSequence, "eventId": r.EventID, "serial": r.Serial, "kind": r.Classification,
 		"cancel": r.Cancelled, "final": r.Final, "warning": r.Warning,
 	}
 	b, err := json.Marshal(payload)

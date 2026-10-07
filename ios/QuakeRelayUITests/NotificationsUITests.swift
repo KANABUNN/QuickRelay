@@ -13,6 +13,9 @@ final class NotificationsUITests: XCTestCase {
         let app = XCUIApplication()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        if let base = ProcessInfo.processInfo.environment["QUAKERELAY_UI_BASE_URL"] {
+            app.launchArguments += ["-settings.serverBaseURL", base]
+        }
         app.launch()
         let allow = springboard.alerts.buttons["Allow"]
         if allow.waitForExistence(timeout: 10) { allow.tap() }
@@ -47,6 +50,37 @@ final class NotificationsUITests: XCTestCase {
                           "Notification tap did not foreground the app: " + state)
             try await action("capture/" + state, at: control, body: screenshot.pngRepresentation)
         }
+        guard let code = ProcessInfo.processInfo.environment["QUAKERELAY_UI_PAIRING_CODE"] else {
+            XCTFail("Missing loopback fixture pairing code"); return
+        }
+        let input = app.textFields["12345678"]
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        input.tap()
+        input.typeText(code)
+        app.buttons["ペアリング"].tap()
+        XCTAssertTrue(app.tabBars.buttons["津波"].waitForExistence(timeout: 15))
+        let ordinary = app.staticTexts["合成震源・通常情報"]
+        XCTAssertTrue(ordinary.waitForExistence(timeout: 10))
+        ordinary.tap()
+        XCTAssertTrue(app.staticTexts["発表区分"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["第9報"].exists)
+        try await action("capture/ordinary", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.tabBars.buttons["津波"].tap()
+        let tsunami = app.staticTexts["合成津波警報"].firstMatch
+        XCTAssertTrue(tsunami.waitForExistence(timeout: 10))
+        tsunami.tap()
+        let height = app.staticTexts["巨大"].firstMatch
+        if !height.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(height.waitForExistence(timeout: 5))
+        try await action("capture/tsunami", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.tabBars.buttons["関連情報"].tap()
+        let advisory = app.staticTexts["合成南海トラフ情報"].firstMatch
+        XCTAssertTrue(advisory.waitForExistence(timeout: 10))
+        advisory.tap()
+        let text = app.staticTexts["合成補足"].firstMatch
+        if !text.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        try await action("capture/advisory", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
     }
 
     private func action(_ path: String, at base: URL, body: Data? = nil) async throws {

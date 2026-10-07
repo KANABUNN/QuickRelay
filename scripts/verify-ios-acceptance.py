@@ -73,6 +73,34 @@ def frames():
                        'classification': classification, 'head': {'type': code, 'test': False},
                        'format': 'json', 'encoding': 'utf-8', 'compression': None,
                        'body': json.dumps(body, ensure_ascii=False)})
+
+    extras = [
+        ('VXSE53', 'earthquake-information', '20261005000002', '震源・震度情報',
+         {'earthquake': {'originTime': at.isoformat(), 'hypocenter': {'name': '合成震源・通常情報'},
+                         'magnitude': {'value': '5.0'}}, 'intensity': {'maxInt': '3'}}),
+        ('VTSE41', 'tsunami-information', '20261005000002 20261005000003', '合成津波警報',
+         {'tsunami': {'forecasts': [{'code': '999', 'name': '合成予報区',
+             'kind': {'code': '53', 'name': '大津波警報', 'lastKind': {'code': '00', 'name': 'なし'}},
+             'firstHeight': {'condition': '津波到達中と推測'},
+             'maxHeight': {'height': {'type': '津波の高さ', 'unit': 'm', 'value': None, 'condition': '巨大'}}}]}}),
+        ('VYSE50', 'earthquake-nankai', None, '合成南海トラフ情報',
+         {'earthquakeInfo': {'kind': {'code': 'synthetic', 'name': '南海トラフ地震臨時情報（調査中）'},
+              'text': 'これは合成資料です。実際の発表ではありません。', 'appendix': '合成補足'}}),
+    ]
+    for index, (code, schema, identity, title, content) in enumerate(extras, start=6):
+        body = {'_schema': {'type': schema, 'version': '1.0.0'}, 'eventId': identity,
+                'serialNo': '9' if code == 'VXSE53' else None, 'status': '通常', 'infoType': '発表',
+                'reportDateTime': (at + dt.timedelta(seconds=index)).isoformat(),
+                'title': title, 'body': content}
+        result.append({'type': 'data', 'id': f'synthetic-ios-acceptance-{index}',
+                       'classification': 'telegram.earthquake', 'head': {'type': code, 'test': False},
+                       'format': 'json', 'encoding': 'utf-8', 'compression': None,
+                       'body': json.dumps(body, ensure_ascii=False)})
+    result.append({'type': 'data', 'id': 'synthetic-ios-acceptance-9',
+                   'classification': 'telegram.earthquake',
+                   'head': {'type': 'WEPA60', 'test': False, 'author': 'synthetic', 'time': at.isoformat()},
+                   'format': 'a/n', 'encoding': 'utf-8', 'compression': None,
+                   'body': 'SYNTHETIC INTERNATIONAL TSUNAMI TEXT. NOT AN ACTUAL ALERT.'})
     return result
 
 
@@ -112,7 +140,7 @@ def notification_control(simulator, evidence):
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
                 command(['xcrun', 'simctl', 'push', simulator, 'jp.kb-dev.quickrelay', str(path)], timeout=30)
                 injections.append(state)
-            elif self.path in ['/capture/' + state for state in ('launched',) + states]:
+            elif self.path in ['/capture/' + state for state in ('launched', 'tsunami', 'advisory', 'ordinary') + states]:
                 state = self.path.rsplit('/', 1)[1]
                 try:
                     size = int(self.headers.get('Content-Length', '0'))
@@ -271,11 +299,30 @@ def main():
                 reports = db.execute('SELECT COUNT(*) FROM reports').fetchone()[0]
                 deliveries = db.execute('SELECT COUNT(*) FROM deliveries').fetchone()[0]
                 revoked = db.execute('SELECT COUNT(*) FROM devices WHERE revoked=1').fetchone()[0]
-                assert reports == 6 and deliveries == 0 and revoked == 1
+                assert reports == 10 and deliveries == 0 and revoked == 1
                 summary['fixture'] = {'reports': reports, 'deliveries': deliveries, 'revoked_devices': revoked,
                                       'integrity_check': 'ok'}
             summary['swift_go_acceptance'] = 'passed'
             summary['simulator_to_public_vps'] = 'passed_read_only' if live else 'not_tested'
+            ui_code = re.search(r'\b[0-9]{8}\b', command([str(binary), 'pair'], env=env)).group()
+            # UI tests grant permission, assert visible notifications, and tap each banner.
+            with notification_control(simulator, evidence) as (control, injections, captures):
+                config = plistlib.loads(files[0].read_bytes())
+                assert configure_tests(config, {'QUAKERELAY_ACCEPTANCE_CONTROL_URL': control,
+                    'QUAKERELAY_UI_BASE_URL': f'http://localhost:{port}/api/v1',
+                    'QUAKERELAY_UI_PAIRING_CODE': ui_code}) > 0
+                test_run = files[0].with_name('notification-acceptance.xctestrun')
+                test_run.write_bytes(plistlib.dumps(config))
+                try:
+                    command(['xcodebuild', 'test-without-building', '-xctestrun', str(test_run),
+                             '-destination', destination, '-parallel-testing-enabled', 'NO',
+                             '-only-testing:QuakeRelayUITests',
+                             '-resultBundlePath', str(work / 'Notifications.xcresult')],
+                            log=evidence / 'notifications.log', timeout=600)
+                finally:
+                    test_run.unlink()
+                assert injections == ['foreground', 'background', 'terminated']
+                assert captures == ['launched', 'foreground', 'background', 'terminated', 'ordinary', 'tsunami', 'advisory']
         finally:
             if relay.poll() is None:
                 relay.terminate()
@@ -284,22 +331,6 @@ def main():
                 except subprocess.TimeoutExpired:
                     relay.kill()
                     relay.wait(timeout=5)
-    # UI tests grant permission, assert visible notifications, and tap each banner.
-    with notification_control(simulator, evidence) as (control, injections, captures):
-        config = plistlib.loads(files[0].read_bytes())
-        assert configure_tests(config, {'QUAKERELAY_ACCEPTANCE_CONTROL_URL': control}) > 0
-        test_run = files[0].with_name('notification-acceptance.xctestrun')
-        test_run.write_bytes(plistlib.dumps(config))
-        try:
-            command(['xcodebuild', 'test-without-building', '-xctestrun', str(test_run),
-                     '-destination', destination, '-parallel-testing-enabled', 'NO',
-                     '-only-testing:QuakeRelayUITests',
-                     '-resultBundlePath', str(work / 'Notifications.xcresult')],
-                    log=evidence / 'notifications.log', timeout=600)
-        finally:
-            test_run.unlink()
-        assert injections == ['foreground', 'background', 'terminated']
-        assert captures == ['launched', 'foreground', 'background', 'terminated']
     summary['simulated_notification_display_and_tap'] = 'passed_foreground_background_terminated'
     summary['notification_transport'] = 'local_simctl_injection_not_apns'
     summary['completed_at_utc'] = dt.datetime.now(dt.timezone.utc).isoformat()

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct EventDetailView: View {
     let eventID: String
@@ -30,6 +31,9 @@ struct EventDetailView: View {
                     List {
                         latestSection(event)
                         if event.isWarningProduct && !event.isCancelled { forecastReferenceSection }
+                        if let latestReport, let bulletin = latestReport.bulletin {
+                            Section("発表内容") { BulletinContent(bulletin: bulletin, reportID: latestReport.id) }
+                        }
                         timelineSection
                     }
                     .onAppear { scrollToHighlightedReport(using: proxy) }
@@ -41,11 +45,11 @@ struct EventDetailView: View {
                 ContentUnavailableView(
                     "情報を読み込めません",
                     systemImage: "exclamationmark.icloud",
-                    description: Text("同期後も見つからない場合は、対象の報がサーバーに残っているか確認してください。")
+                    description: Text("同期後も見つからない場合は、対象の情報がサーバーに残っているか確認してください。")
                 )
             }
         }
-        .navigationTitle(events.first.map { $0.numericHypocenter.label($0.numericHypocenter.epicenter ?? "震源不明") } ?? "地震詳細")
+        .navigationTitle(events.first?.displayTitle ?? "情報の詳細")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             _ = await repository.syncAll()
@@ -66,9 +70,7 @@ struct EventDetailView: View {
             if let intensity = event.maxIntensity {
                 LabeledContent(event.intensityLabel, value: intensity)
             }
-            if let revision = event.sourceSerial {
-                LabeledContent("最新報", value: "第\(revision)報")
-            }
+            LabeledContent(event.isEEW ? "最新報" : "発表区分", value: event.publicationLabel)
             if let latestReport {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(latestReport.title)
@@ -81,7 +83,7 @@ struct EventDetailView: View {
             if event.isCancelled {
                 Label("この情報は取り消されました", systemImage: "xmark.octagon.fill")
                     .foregroundStyle(.orange)
-            } else if event.isFinal {
+            } else if event.isEEW && event.isFinal {
                 Label("最終報", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.blue)
             }
@@ -111,9 +113,9 @@ struct EventDetailView: View {
     }
 
     private var timelineSection: some View {
-        Section("報履歴") {
+        Section("発表履歴") {
             if reports.isEmpty {
-                Text("報履歴はまだ同期されていません。")
+                Text("発表履歴はまだ同期されていません。")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(sortedReports) { report in
@@ -151,13 +153,7 @@ private struct ReportTimelineRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                if let revision = report.revision {
-                    Text("第\(revision)報")
-                        .font(.headline)
-                } else {
-                    Text(RelayEventType(rawValue: report.eventType)?.displayName ?? report.eventType)
-                        .font(.headline)
-                }
+                Text(report.publicationLabel).font(.headline)
                 Spacer()
                 Text(report.receivedAt, format: .dateTime.hour().minute().second())
                     .font(.caption.monospacedDigit())
@@ -174,9 +170,12 @@ private struct ReportTimelineRow: View {
                 }
                 .font(.subheadline)
             }
+            if let bulletin = report.bulletin {
+                DisclosureGroup("この発表の詳細") { BulletinContent(bulletin: bulletin, reportID: report.id) }
+            }
             HStack {
                 if report.isCancelled { StatusBadge(text: "取消", color: .orange) }
-                if report.isFinal { StatusBadge(text: "最終", color: .blue) }
+                if report.isEEW && report.isFinal { StatusBadge(text: "最終", color: .blue) }
                 Spacer()
                 Text("seq \(report.serverSequence)")
                     .font(.caption2.monospacedDigit())
@@ -212,6 +211,66 @@ private struct HypocenterFields: View {
                 LabeledContent(value.label("マグニチュード"), value: magnitude.formatted(.number.precision(.fractionLength(1))))
             }
             if let depth = value.depthText { LabeledContent(value.label("深さ"), value: depth) }
+        }
+    }
+}
+
+private struct SourceFile: FileDocument {
+    static var readableContentTypes: [UTType] { [.data] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+
+private struct BulletinContent: View {
+    let bulletin: BulletinDTO
+    let reportID: String
+    @EnvironmentObject private var repository: EventRepository
+    @State private var file: SourceFile?
+    @State private var exporting = false
+    @State private var loading = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let headline = bulletin.headline, !headline.isEmpty {
+                Text(headline).font(.subheadline).textSelection(.enabled)
+            }
+            ForEach(Array((bulletin.sections ?? []).enumerated()), id: \.offset) { _, section in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(section.title).font(.subheadline.bold())
+                    if let text = section.text { Text(text).textSelection(.enabled) }
+                    ForEach(Array((section.rows ?? []).enumerated()), id: \.offset) { _, row in
+                        LabeledContent(row.label, value: row.value)
+                    }
+                }
+            }
+            if let document = bulletin.document {
+                if !document.complete {
+                    Text("この資料は分割データです。各受信片は発表履歴から保存できます。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Button {
+                    loading = true
+                    Task {
+                        defer { loading = false }
+                        do {
+                            file = SourceFile(data: try await repository.sourceDocument(reportID: reportID))
+                            error = nil
+                            exporting = true
+                        } catch { self.error = error.localizedDescription }
+                    }
+                } label: {
+                    if loading { ProgressView() } else { Label("原電文を保存", systemImage: "square.and.arrow.down") }
+                }
+                .disabled(loading)
+                if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            }
+        }
+        .fileExporter(isPresented: $exporting, document: file, contentType: .data,
+                      defaultFilename: "\(reportID).\(bulletin.document?.fileExtension ?? "bin")") { result in
+            if case let .failure(failure) = result { error = failure.localizedDescription }
         }
     }
 }

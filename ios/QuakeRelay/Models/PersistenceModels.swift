@@ -4,6 +4,8 @@ import SwiftData
 @Model
 final class EventEntity {
     @Attribute(.unique) var id: String
+    var title: String? = nil
+    var infoType: String? = nil
     var category: String
     var eventType: String
     var originTime: Date?
@@ -23,6 +25,8 @@ final class EventEntity {
 
     init(dto: EventDTO) {
         id = dto.id
+        title = dto.title
+        infoType = dto.infoType
         category = dto.category
         eventType = dto.eventType
         originTime = ServerDateParser.parse(dto.originTime)
@@ -45,6 +49,8 @@ final class EventEntity {
         // The VPS has already resolved ordering separately for each telegram type.
         // Applying sticky terminal flags here would cancel later, independent products.
         guard EventMergePolicy.shouldReplaceCurrentState(existing: self, incoming: dto) else { return }
+        title = dto.title
+        infoType = dto.infoType
         category = dto.category
         eventType = dto.eventType
         originTime = ServerDateParser.parse(dto.originTime)
@@ -72,6 +78,9 @@ final class EventEntity {
                              depthKm: depthKm, magnitude: magnitude)
     }
 
+    var isEEW: Bool { RelayEventType(rawValue: eventType)?.isEEW == true }
+    var publicationLabel: String { PublicationLabel.text(eventType: eventType, serial: sourceSerial, infoType: infoType, cancelled: isCancelled) }
+    var displayTitle: String { title ?? RelayEventType(rawValue: eventType)?.displayName ?? "関連情報" }
     var intensityLabel: String {
         RelayEventType(rawValue: eventType)?.isEEW == true ? "予想最大震度" : "観測最大震度"
     }
@@ -98,6 +107,8 @@ final class ReportEntity {
     var hypocenterData: Data? = nil
     var maxIntensity: String? = nil
     var isWarning: Bool? = nil
+    var infoType: String? = nil
+    var bulletinData: Data? = nil
 
     init(dto: ReportDTO, serverSequence: Int64) {
         id = dto.id
@@ -118,6 +129,8 @@ final class ReportEntity {
         hypocenterData = dto.numericHypocenter.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
         maxIntensity = dto.maxIntensity
         isWarning = dto.isWarning
+        infoType = dto.infoType
+        bulletinData = dto.bulletin.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
     }
 
     func update(from dto: ReportDTO, serverSequence: Int64) {
@@ -138,8 +151,16 @@ final class ReportEntity {
         hypocenterData = dto.numericHypocenter.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
         maxIntensity = dto.maxIntensity
         isWarning = dto.isWarning
+        infoType = dto.infoType
+        bulletinData = dto.bulletin.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
     }
 
+    var isEEW: Bool { RelayEventType(rawValue: eventType)?.isEEW == true }
+    var publicationLabel: String { PublicationLabel.text(eventType: eventType, serial: revision, infoType: infoType, cancelled: isCancelled) }
+    var bulletin: BulletinDTO? {
+        guard let bulletinData else { return nil }
+        return try? JSONDecoder.quakeRelay.decode(BulletinDTO.self, from: bulletinData)
+    }
     var numericHypocenter: HypocenterDTO? {
         guard let hypocenterData else { return nil }
         return try? JSONDecoder.quakeRelay.decode(HypocenterDTO.self, from: hypocenterData)

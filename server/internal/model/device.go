@@ -8,7 +8,7 @@ type Preferences struct {
 }
 
 func DefaultPreferences() Preferences {
-	return Preferences{true, true, true, []string{"eew_forecast", "eew_warning", "eew_cancel", "earthquake_info", "earthquake_update", "system_test"}}
+	return Preferences{true, true, true, []string{"eew_forecast", "eew_warning", "eew_cancel", "earthquake_info", "earthquake_update", "tsunami_warning", "tsunami_info", "nankai_info", "seismic_advisory", "earthquake_data", "system_test"}}
 }
 
 type Device struct {

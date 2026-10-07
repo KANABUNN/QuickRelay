@@ -3,6 +3,8 @@ import Foundation
 
 enum AppTab: Hashable {
     case events
+    case tsunami
+    case advisory
     case settings
 }
 
@@ -43,9 +45,16 @@ final class DeepLinkRouter: ObservableObject {
     @Published var selectedTab: AppTab = .events
     @Published var path: [AppRoute] = []
 
+    @Published var tsunamiPath: [AppRoute] = []
+    @Published var advisoryPath: [AppRoute] = []
+
     func open(_ route: AppRoute) {
-        selectedTab = .events
-        path = [route]
+        switch route {
+        case let .event(id, _):
+            if id.hasPrefix("tsunami-") { selectedTab = .tsunami; tsunamiPath = [route] }
+            else if id.hasPrefix("advisory-") { selectedTab = .advisory; advisoryPath = [route] }
+            else { selectedTab = .events; path = [route] }
+        }
     }
 
     func open(_ url: URL) {
@@ -55,5 +64,8 @@ final class DeepLinkRouter: ObservableObject {
 
     func reset() {
         path.removeAll()
+        tsunamiPath.removeAll()
+        advisoryPath.removeAll()
+        selectedTab = .events
     }
 }

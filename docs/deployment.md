@@ -208,9 +208,9 @@ Debug実機はsandbox/development、TestFlightはproductionです。`APNS_ENVIRO
 
 ## 5. DMDATA設定とlive起動
 
-[DMDATA Socket Start v2](https://dmdata.jp/docs/reference/api/v2/socket.start/)に合わせ、契約済み区分を `DMDATA_CLASSIFICATIONS` へ指定します。既定は `eew.forecast,eew.warning,telegram.earthquake`、対象電文は区分に対応するVXSE45/VXSE43/VXSE51/VXSE52/VXSE53です。未知区分や重複は設定エラーにします。test=no、formatMode=json、appName=Quick Relayは固定です。
+[DMDATA Socket Start v2](https://dmdata.jp/docs/reference/api/v2/socket.start/)に合わせ、契約済み区分を DMDATA_CLASSIFICATIONS へ指定します。既定は eew.forecast,eew.warning,telegram.earthquake。未知区分や重複は設定エラーです。typesを省略し、formats=[json,a/n,binary]、test=no、appName=Quick Relayで購読します。
 
-`telegram.earthquake` の全電文を受信する設定ではありません。津波・南海トラフ・長周期地震動等の専用電文は取得・保存・通知しません。今回の対象は[初回リリース範囲](initial-release-scope.md)の5電文で、それ以外の電文追加・切断区間backfill・OAuth自動更新・履歴自動削除は行いません。
+[受信対象と表示](earthquake-tsunami-products.md)の20種を処理します。サーバーを先に配備してからアプリを更新します。/readyzに加えて正規化失敗数を確認してください。切断区間の自動補完はありません。
 
 APIキーへ `socket.start`、自分のsocketを終了する `socket.close`、購読する区分の `eew.get.forecast` / `eew.get.warning` / `telegram.get.earthquake` を付与します。未契約区分は設定から外します。
 

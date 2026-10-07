@@ -100,7 +100,7 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 			}
 		}
 	}
-	if current && notify {
+	if current && notify && r.PushEligible() {
 		_, err = tx.ExecContext(ctx, `INSERT INTO deliveries(report_sequence,device_id,next_attempt_ms,expires_ms,updated_ms)
           SELECT ?,installation_id,?,?,? FROM devices WHERE revoked=0 AND push_active=1`,
 			r.ServerSequence, r.ReceivedAt.UnixMilli(), r.ReportedAt.Add(r.TTL()).UnixMilli(), r.ReceivedAt.UnixMilli())
@@ -223,4 +223,25 @@ func (s *Store) Event(ctx context.Context, id string) (model.Event, []model.Repo
 		return event, nil, rowsErr
 	}
 	return event, reports, tx.Commit()
+}
+
+// SourceReport is available only through an authenticated API handler.
+func (s *Store) SourceReport(ctx context.Context, id string) (model.Report, []byte, error) {
+	var r model.Report
+	var payload string
+	var raw []byte
+	err := s.DB.QueryRowContext(ctx, "SELECT payload,raw FROM reports WHERE id=?", id).Scan(&payload, &raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return r, nil, ErrNotFound
+	}
+	if err != nil {
+		return r, nil, err
+	}
+	if err = json.Unmarshal([]byte(payload), &r); err != nil {
+		return r, nil, err
+	}
+	if r.IsEEW() || r.Bulletin == nil || r.Bulletin.Document == nil {
+		return r, nil, ErrNotFound
+	}
+	return r, raw, nil
 }

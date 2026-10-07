@@ -92,3 +92,37 @@ final class ReportTimelineTests: XCTestCase {
         XCTAssertEqual(result.map(\.id), ["rpt_generic", "rpt_1"])
     }
 }
+
+extension ReportTimelineTests {
+    func testOnlyEEWHasNumberedReportsIncludingOldCachedOrdinaryReports() {
+        XCTAssertEqual(PublicationLabel.text(eventType: "eew_forecast", serial: 3, infoType: "発表", cancelled: false), "第3報")
+        for type in ["earthquake_info", "earthquake_update", "tsunami_info", "tsunami_warning", "nankai_info"] {
+            XCTAssertEqual(PublicationLabel.text(eventType: type, serial: 3, infoType: nil, cancelled: false), "発表")
+            XCTAssertEqual(PublicationLabel.text(eventType: type, serial: 3, infoType: "訂正", cancelled: false), "訂正")
+            XCTAssertEqual(PublicationLabel.text(eventType: type, serial: 3, infoType: "取消", cancelled: true), "取消")
+        }
+    }
+
+    @MainActor
+    func testExpandedPreferencesPreserveExistingOptOutAndApplyOnlyOnce() throws {
+        let suite = "expanded-preferences.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        let old = DevicePreferences(notificationsEnabled: true, timeSensitiveEnabled: false, customSoundEnabled: false, eventTypes: ["eew_warning"])
+        settings.apply(old)
+        XCTAssertFalse(settings.earthquakeNotificationsEnabled)
+        XCTAssertFalse(settings.timeSensitiveEnabled)
+        XCTAssertTrue(settings.enabledEventTypes.contains("tsunami_warning"))
+        XCTAssertTrue(settings.enabledEventTypes.contains("nankai_info"))
+        settings.expandedPreferencesSaved()
+        settings.apply(old)
+        XCTAssertFalse(settings.tsunamiNotificationsEnabled)
+        XCTAssertFalse(settings.advisoryNotificationsEnabled)
+        settings.notificationsEnabled = false
+        XCTAssertTrue(settings.enabledEventTypes.isEmpty)
+        let reopened = AppSettings(defaults: defaults)
+        XCTAssertFalse(reopened.needsExpandedPreferences)
+        XCTAssertFalse(reopened.tsunamiNotificationsEnabled)
+    }
+}

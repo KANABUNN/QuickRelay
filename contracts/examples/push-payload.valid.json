@@ -16,5 +16,6 @@
   "cancel": false,
   "final": false,
   "warning": false,
-  "server_sequence": 1
+  "server_sequence": 1,
+  "category": "earthquake"
 }

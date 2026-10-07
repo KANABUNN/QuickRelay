@@ -28,7 +28,7 @@ iOS ↔ Caddy HTTPS ↔ loopback HTTP API（pairing / devices / sync / events）
 | DB | `/var/lib/quick-relay/quickrelay.db` |
 | 公開hostname | `relay.example.com` |
 
-受信・正規化の対象は `VXSE45`、`VXSE43`、`VXSE51`、`VXSE52`、`VXSE53` の5電文です。`telegram.earthquake` の契約区分全体を処理するものではありません。津波・南海トラフ・長周期地震動等の専用電文、切断区間の自動backfill、OAuth自動更新、履歴自動削除は未実装です。[初回リリース範囲](initial-release-scope.md)を参照してください。
+受信対象は契約済み3区分の20種です。[受信対象と表示](earthquake-tsunami-products.md)を参照してください。切断区間の自動backfill、OAuth自動更新、履歴自動削除は未実装です。
 
 Windows、EarthQuickly、Talker、PHP、MySQL、PWAはmainの実装・ビルド対象から除外しました。この公開リポジトリには旧版の実装や個別の運用記録を含めません。
 
