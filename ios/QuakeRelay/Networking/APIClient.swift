@@ -128,7 +128,11 @@ final class APIClient {
             notificationsEnabled: preferences.notificationsEnabled,
             timeSensitiveEnabled: preferences.timeSensitiveEnabled,
             customSoundEnabled: preferences.customSoundEnabled,
-            eventTypes: preferences.eventTypes
+            eventTypes: preferences.eventTypes,
+            earthquakeRegions: preferences.earthquakeRegions ?? [],
+            tsunamiRegions: preferences.tsunamiRegions ?? [],
+            minimumIntensity: preferences.minimumIntensity ?? "",
+            liveActivitiesEnabled: preferences.liveActivitiesEnabled ?? false
         )
         let body = try encoder.encode(patch)
         return try await request(
@@ -147,6 +151,15 @@ final class APIClient {
         let request = try makeRequest(path: "", queryItems: [], serverBaseURL: settings.serverBaseURL)
         guard let url = request.url else { throw APIClientError.invalidBaseURL }
         return url.absoluteString
+    }
+
+    func receiverStatus() async throws -> ReceiverStatusResponse {
+        try await request(path: "status", authentication: .device)
+    }
+
+    func requestNotificationTest(id: String, style: String) async throws -> NotificationTestResponse {
+        let body = try encoder.encode(NotificationTestRequest(requestId: id, style: style))
+        return try await request(path: "devices/me/notification-tests", method: "POST", body: body, authentication: .device)
     }
 
     func health() async throws -> HealthResponse {
@@ -270,5 +283,24 @@ final class APIClient {
         components.fragment = nil
         guard let url = components.url else { throw APIClientError.invalidBaseURL }
         return URLRequest(url: url)
+    }
+}
+
+extension APIClient {
+    func registerLiveActivityStartToken(_ token: String) async throws {
+        let body = try encoder.encode(["push_token": token])
+        let _: SuccessResponse = try await request(path: "devices/me/live-activity/start-token",
+                                                   method: "PUT", body: body, authentication: .device)
+    }
+    func registerLiveActivityToken(eventID: String, telegramType: String, activityID: String, pushToken: String) async throws {
+        let body = try encoder.encode(["event_id": eventID, "telegram_type": telegramType,
+                                       "activity_id": activityID, "push_token": pushToken])
+        let _: SuccessResponse = try await request(path: "devices/me/live-activity/token",
+                                                   method: "PUT", body: body, authentication: .device)
+    }
+    func liveActivityEnded(eventID: String, telegramType: String, activityID: String) async throws {
+        let body = try encoder.encode(["event_id": eventID, "telegram_type": telegramType, "activity_id": activityID])
+        let _: SuccessResponse = try await request(path: "devices/me/live-activity/ended",
+                                                   method: "POST", body: body, authentication: .device)
     }
 }

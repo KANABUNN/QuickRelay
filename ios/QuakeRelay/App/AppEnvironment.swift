@@ -54,7 +54,17 @@ final class AppEnvironment: ObservableObject {
     let router: DeepLinkRouter
     let notifications: NotificationCoordinator
     let deviceRegistration: DeviceRegistrationCoordinator
-    let liveActivityTokenRegistrar: any LiveActivityPushTokenRegistrar
+    let liveActivities: LiveActivityCoordinator
+
+    @Published private(set) var receiverStatus: ReceiverStatusResponse?
+    @Published private(set) var receiverStatusCheckedAt: Date?
+    @Published private(set) var receiverStatusError: String?
+    @Published private(set) var isTestingNotification = false
+    @Published private(set) var notificationTestResult: NotificationTestDTO?
+    @Published private(set) var notificationTestError: String?
+    @Published private(set) var notificationTestAvailableAt: Date?
+    private var testRequestID: String?
+    private var testRequestStyle: String?
 
     private var started = false
     private var pairingInProgress = false
@@ -95,7 +105,7 @@ final class AppEnvironment: ObservableObject {
             credentials: resolvedCredentials,
             settings: resolvedSettings
         )
-        self.liveActivityTokenRegistrar = DisabledLiveActivityPushTokenRegistrar()
+        self.liveActivities = LiveActivityCoordinator(api: resolvedAPI)
         self.startupError = containerError
 
         resolvedNotifications.onSyncRequested = { [weak resolvedRepository] in
@@ -118,7 +128,8 @@ final class AppEnvironment: ObservableObject {
         // Resolve existing settings and the one-time category expansion before APNs registration.
         if isPaired { await refreshRemotePreferences() }
         await notifications.configureAndRegisterForRemoteNotifications()
-        if isPaired { _ = await repository.syncAll() }
+        if isPaired { _ = await repository.syncAll(); await refreshReceiverStatus() }
+        await liveActivities.configure(enabled: settings.notificationsEnabled && settings.liveActivitiesEnabled, paired: isPaired)
     }
 
     func pair(code: String) async -> Bool {
@@ -151,6 +162,8 @@ final class AppEnvironment: ObservableObject {
             try credentials.saveAccessToken(response.deviceAccessToken, for: pairingServerURL)
             isPaired = true
             deviceRegistration.pairingCompleted()
+            receiverStatus = nil; receiverStatusCheckedAt = nil; receiverStatusError = nil
+            await liveActivities.configure(enabled: settings.notificationsEnabled && settings.liveActivitiesEnabled, paired: true)
             _ = await repository.syncAll()
             return true
         } catch {
@@ -174,6 +187,10 @@ final class AppEnvironment: ObservableObject {
             }
             try credentials.clearAccessToken()
             isPaired = false
+            receiverStatus = nil; receiverStatusCheckedAt = nil; receiverStatusError = nil
+            notificationTestResult = nil; notificationTestError = nil; notificationTestAvailableAt = nil
+            testRequestID = nil
+            await liveActivities.configure(enabled: false, paired: false)
             router.reset()
             pairingError = nil
         } catch {
@@ -189,10 +206,51 @@ final class AppEnvironment: ObservableObject {
         do {
             _ = try await api.updatePreferences(settings.devicePreferences)
             settings.expandedPreferencesSaved()
+            await liveActivities.configure(enabled: settings.notificationsEnabled && settings.liveActivitiesEnabled, paired: true)
             return true
         } catch {
             diagnosticsError = error.localizedDescription
             return false
+        }
+    }
+
+    func monitorReceiverStatus() async {
+        while !Task.isCancelled {
+            if isPaired { await refreshReceiverStatus() }
+            do { try await Task.sleep(for: .seconds(30)) }
+            catch { return }
+        }
+    }
+
+    func refreshReceiverStatus() async {
+        guard isPaired else { return }
+        do {
+            receiverStatus = try await api.receiverStatus()
+            receiverStatusCheckedAt = Date()
+            receiverStatusError = nil
+        } catch {
+            if !Task.isCancelled { receiverStatusError = error.localizedDescription }
+        }
+    }
+
+    func sendNotificationTest(style: String) async {
+        guard isPaired, !isTestingNotification else { return }
+        isTestingNotification = true
+        notificationTestError = nil
+        defer { isTestingNotification = false }
+        if testRequestID == nil || testRequestStyle != style {
+            testRequestID = UUID().uuidString
+            testRequestStyle = style
+        }
+        do {
+            let response = try await api.requestNotificationTest(id: testRequestID!, style: style)
+            notificationTestResult = response.test
+            let requested = ServerDateParser.parse(response.test.requestedAt) ?? Date()
+            notificationTestAvailableAt = requested.addingTimeInterval(TimeInterval(response.cooldownSeconds))
+            testRequestID = nil
+        } catch {
+            notificationTestError = error.localizedDescription
+            // Retain the request ID after an uncertain transport result.
         }
     }
 
@@ -228,6 +286,8 @@ final class AppEnvironment: ObservableObject {
             // must not reactivate a token APNs has since invalidated.
             notifications.registerForRemoteNotifications()
             _ = await repository.syncAll()
+            await refreshReceiverStatus()
+            await liveActivities.configure(enabled: settings.notificationsEnabled && settings.liveActivitiesEnabled, paired: true)
         }
     }
 

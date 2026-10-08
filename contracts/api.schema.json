@@ -150,6 +150,12 @@
         },
         "bulletin": {
           "$ref": "#/$defs/Bulletin"
+        },
+        "affected_areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AffectedArea"
+          }
         }
       }
     },
@@ -564,6 +570,21 @@
         },
         "complete": {
           "type": "boolean"
+        }
+      }
+    },
+    "AffectedArea": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_intensity": {
+          "type": "string"
         }
       }
     }

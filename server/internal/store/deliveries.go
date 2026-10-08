@@ -91,3 +91,11 @@ func (s *Store) DeliveryCounts(ctx context.Context) (map[string]int64, error) {
 	}
 	return counts, rows.Err()
 }
+
+// A forecast cancellation never cancels an independently followed warning.
+func (s *Store) Followed(ctx context.Context, device string, r model.Report) (bool, error) {
+	var n int
+	err := s.DB.QueryRowContext(ctx, `SELECT count(*) FROM deliveries d JOIN reports p ON p.sequence=d.report_sequence
+    WHERE d.device_id=? AND d.status IN ('accepted','sending') AND p.event_id=? AND p.telegram_type=?`, device, r.EventID, r.TelegramType).Scan(&n)
+	return n > 0, err
+}

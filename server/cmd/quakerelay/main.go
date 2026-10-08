@@ -148,6 +148,7 @@ func serve(c config.Config, st *store.Store) error {
 		if err != nil {
 			return err
 		}
+		app.TestSender = sender
 		app.APNsConfigured = true
 		app.APNsEnvironmentAllowed = sender.Supports
 		app.Source = source
@@ -198,6 +199,8 @@ func serve(c config.Config, st *store.Store) error {
 			wg.Add(1)
 			go func() { defer wg.Done(); (&relay.Worker{Store: st, Sender: sender, Logger: logger}).Run(ctx) }()
 		}
+		wg.Add(1)
+		go func() { defer wg.Done(); (&relay.Worker{Store: st, Sender: sender, Logger: logger}).RunLive(ctx) }()
 	}
 	logger.Info("QuakeRelay started", "mode", c.Mode, "listen", c.Listen)
 	var serveErr error

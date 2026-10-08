@@ -120,6 +120,15 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 			return out, err
 		}
 	}
+	if current && notify && r.SupportsLiveActivity() {
+		_, err = tx.ExecContext(ctx, `INSERT INTO live_activity_jobs(report_sequence,device_id,next_attempt_ms,expires_ms,updated_ms)
+            SELECT ?,installation_id,?,?,? FROM devices WHERE revoked=0 AND push_active=1
+            AND json_extract(preferences,'$.notifications_enabled')=1 AND json_extract(preferences,'$.live_activities_enabled')=1`,
+			r.ServerSequence, r.ReceivedAt.UnixMilli(), r.ReportedAt.Add(r.TTL()).UnixMilli(), r.ReceivedAt.UnixMilli())
+		if err != nil {
+			return out, err
+		}
+	}
 	return out, tx.Commit()
 }
 func (s *Store) Sync(ctx context.Context, after int64, limit int) (model.SyncPage, error) {

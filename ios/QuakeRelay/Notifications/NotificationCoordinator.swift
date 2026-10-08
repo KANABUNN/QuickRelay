@@ -130,7 +130,9 @@ final class NotificationCoordinator: NSObject, ObservableObject, UNUserNotificat
         Task { @MainActor [weak self] in
             defer { completionHandler() }
             guard let self else { return }
-            if let route = DeepLinkParser.parse(userInfo: userInfo) {
+            if userInfo["category"] as? String == "system_test" {
+                self.router.selectedTab = .settings
+            } else if let route = DeepLinkParser.parse(userInfo: userInfo) {
                 self.router.open(route)
             }
             self.onSyncRequested?()

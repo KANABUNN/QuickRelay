@@ -15,11 +15,15 @@ struct QuakeRelayApp: App {
                 .environmentObject(environment.router)
                 .environmentObject(environment.notifications)
                 .environmentObject(environment.deviceRegistration)
+                .environmentObject(environment.liveActivities)
                 .task {
                     // Bind before start() requests APNs registration, so its
                     // callback cannot race the delegate/environment wiring.
                     appDelegate.bind(environment: environment)
                     await environment.start()
+                }
+                .task(id: scenePhase) {
+                    if scenePhase == .active { await environment.monitorReceiverStatus() }
                 }
                 .onOpenURL { url in
                     environment.handle(url: url)

@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject private var repository: EventRepository
     @EnvironmentObject private var notifications: NotificationCoordinator
     @EnvironmentObject private var deviceRegistration: DeviceRegistrationCoordinator
+    @EnvironmentObject private var liveActivities: LiveActivityCoordinator
 
     @State private var showUnpairConfirmation = false
     @State private var saveResult: String?
@@ -23,11 +24,31 @@ struct SettingsView: View {
                     .disabled(!settings.notificationsEnabled)
                 Toggle("緊急地震速報", isOn: $settings.eewNotificationsEnabled)
                     .disabled(!settings.notificationsEnabled)
+                if settings.eewNotificationsEnabled {
+                    Toggle("予報の各報更新", isOn: $settings.eewForecastEnabled)
+                    Toggle("警報", isOn: $settings.eewWarningEnabled)
+                }
 
                 Toggle("津波情報", isOn: $settings.tsunamiNotificationsEnabled)
                     .disabled(!settings.notificationsEnabled)
+                if settings.tsunamiNotificationsEnabled {
+                    Toggle("津波警報・注意報", isOn: $settings.tsunamiWarningEnabled)
+                    Toggle("津波予報・観測情報", isOn: $settings.tsunamiObservationsEnabled)
+                }
                 Toggle("南海トラフ・地震関連情報", isOn: $settings.advisoryNotificationsEnabled)
                     .disabled(!settings.notificationsEnabled)
+                if settings.advisoryNotificationsEnabled {
+                    Toggle("南海トラフ情報", isOn: $settings.nankaiEnabled)
+                    Toggle("その他の地震関連情報", isOn: $settings.seismicAdvisoryEnabled)
+                }
+                Toggle("Live Activity", isOn: $settings.liveActivitiesEnabled)
+                    .disabled(!settings.notificationsEnabled || !liveActivities.supportsRemoteStart)
+                Text(liveActivities.statusText).font(.caption).foregroundStyle(.secondary)
+                Text("iOS 17.2以降で、EEW予報・津波警報や注意報の続報をロック画面に表示します。開始時の通知と通常通知は兼用し、以降の表示更新は無音です。情報が古くなると未確認と表示します。")
+                    .font(.caption).foregroundStyle(.secondary)
+                if let error = liveActivities.registrationError {
+                    Text(error).font(.caption).foregroundStyle(.orange)
+                }
 
                 Button {
                     Task {
@@ -49,6 +70,25 @@ struct SettingsView: View {
                         .foregroundStyle(saveResult.contains("失敗") ? .red : .secondary)
                 }
             }
+
+            Section {
+                TextField("例：石川県、宮崎県", text: $settings.earthquakeRegionsText)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .accessibilityLabel("地震の通知対象地域")
+                TextField("例：宮崎県、石川県加賀", text: $settings.tsunamiRegionsText)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .accessibilityLabel("津波の通知対象地域")
+                Picker("地震・EEW予報の最低震度", selection: $settings.minimumIntensity) {
+                    Text("指定なし").tag("")
+                    ForEach(["1","2","3","4","5-","5+","6-","6+","7"], id: \.self) { value in
+                        Text(value.replacingOccurrences(of: "-", with: "弱").replacingOccurrences(of: "+", with: "強")).tag(value)
+                    }
+                }
+            } header: { Text("通知の絞り込み") } footer: {
+                Text("空欄は全地域です。電文に記載された都道府県・細分地域名、津波予報区名を読点で区切って入力します。地域や震度が不明なら通知します。EEW警報には最低震度を適用せず、通知済みの情報の取消・最終報・津波の解除も受け取ります。変更後は上の保存ボタンを押してください。")
+            }
+
+            NotificationTestView()
 
             Section("接続") {
                 TextField("https://quake.example.jp/api/v1", text: $settings.serverBaseURL)

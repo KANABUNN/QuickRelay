@@ -37,6 +37,7 @@ type Client struct {
 
 type Request struct {
 	Token, Environment string
+	PushType           string
 	Payload            []byte
 	Expiration         time.Time
 	Priority           int
@@ -136,6 +137,16 @@ func (c *Client) Send(ctx context.Context, n Request) (Result, error) {
 	if n.Priority != 5 && n.Priority != 10 {
 		return Result{}, errors.New("invalid APNs priority")
 	}
+	pushType, topic := n.PushType, c.topic
+	if pushType == "" {
+		pushType = "alert"
+	}
+	if pushType != "alert" && pushType != "liveactivity" {
+		return Result{}, errors.New("unsupported APNs push type")
+	}
+	if pushType == "liveactivity" {
+		topic += ".push-type.liveactivity"
+	}
 	jwt, err := c.token()
 	if err != nil {
 		return Result{}, err
@@ -146,8 +157,8 @@ func (c *Client) Send(ctx context.Context, n Request) (Result, error) {
 	}
 	req.Header.Set("Authorization", "bearer "+jwt)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("apns-topic", c.topic)
-	req.Header.Set("apns-push-type", "alert")
+	req.Header.Set("apns-topic", topic)
+	req.Header.Set("apns-push-type", pushType)
 	req.Header.Set("apns-priority", strconv.Itoa(n.Priority))
 	expiry := int64(0)
 	if !n.Expiration.IsZero() {

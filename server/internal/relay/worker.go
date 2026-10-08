@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"math/rand/v2"
-	"slices"
 	"strings"
 	"time"
 
@@ -83,8 +82,11 @@ func (w *Worker) Step(ctx context.Context) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	if !device.Active || !device.PushActive || !device.Preferences.NotificationsEnabled ||
-		!slices.Contains(device.Preferences.EventTypes, d.Report.EventType) {
+	following, err := w.Store.Followed(ctx, d.DeviceID, d.Report)
+	if err != nil {
+		return true, err
+	}
+	if !device.Active || !device.PushActive || !device.Preferences.Allows(d.Report, following) {
 		return finish("skipped", "device_or_preference_disabled", now)
 	}
 	stale, err := w.Store.Superseded(ctx, d.Report, d.Attempts > 1)
@@ -93,6 +95,16 @@ func (w *Worker) Step(ctx context.Context) (bool, error) {
 	}
 	if stale {
 		return finish("skipped", "superseded", now)
+	}
+	started, err := w.liveStart(ctx, *d, device, now)
+	if started {
+		if err != nil {
+			return true, err
+		}
+		return finish("accepted", "live_activity_start", now)
+	}
+	if err != nil {
+		return true, err
 	}
 	body, err := Payload(d.Report, device.Preferences)
 	if err != nil {
@@ -165,4 +177,27 @@ func (w *Worker) Run(ctx context.Context) {
 		case <-timer.C:
 		}
 	}
+}
+
+// This is an explicit diagnostic for the requesting installation, not a
+// synthetic earthquake. It never enters shared reports or source history.
+func NotificationTestPayload(test model.NotificationTest, p model.Preferences) ([]byte, error) {
+	sound, level := "default", "active"
+	title := "Quick Relay 通知テスト"
+	if p.CustomSoundEnabled {
+		sound = "normal.caf"
+	}
+	if test.Style == "warning" {
+		title += "（警報音）"
+		if p.TimeSensitiveEnabled {
+			level = "time-sensitive"
+		}
+		if p.CustomSoundEnabled {
+			sound = "quake_warning.caf"
+		}
+	}
+	return json.Marshal(map[string]any{"aps": map[string]any{
+		"alert": map[string]string{"title": title, "body": "これは通知経路のテストです。地震情報ではありません。"},
+		"sound": sound, "interruption-level": level, "thread-id": "quick-relay-tests"},
+		"category": "system_test", "test_id": test.ID})
 }

@@ -159,3 +159,25 @@ func TestHTTP2ResponseMatrix(t *testing.T) {
 		})
 	}
 }
+
+func TestLiveActivityTopicAndPushType(t *testing.T) {
+	c := client(t)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("apns-push-type") != "liveactivity" || r.Header.Get("apns-topic") != "jp.kb-dev.quickrelay.push-type.liveactivity" || r.ProtoMajor != 2 {
+			t.Error("incorrect ActivityKit headers")
+		}
+		w.WriteHeader(200)
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+	c.http = server.Client()
+	c.endpoint = func(string) string { return server.URL }
+	_, err := c.Send(context.Background(), Request{Token: "aabb", Environment: "production", Payload: []byte(`{"aps":{"event":"update"}}`), PushType: "liveactivity", Priority: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Send(context.Background(), Request{Token: "aabb", Environment: "production", Payload: []byte("{}"), PushType: "unknown", Priority: 10}); err == nil {
+		t.Fatal("unknown push type accepted")
+	}
+}

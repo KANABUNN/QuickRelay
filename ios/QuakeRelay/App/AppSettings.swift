@@ -15,6 +15,37 @@ final class AppSettings: ObservableObject {
         static let eewNotificationsEnabled = "settings.eewNotificationsEnabled"
     }
 
+    @Published var earthquakeRegionsText: String {
+        didSet { defaults.set(earthquakeRegionsText, forKey: "settings.earthquakeRegions") }
+    }
+    @Published var tsunamiRegionsText: String {
+        didSet { defaults.set(tsunamiRegionsText, forKey: "settings.tsunamiRegions") }
+    }
+    @Published var minimumIntensity: String {
+        didSet { defaults.set(minimumIntensity, forKey: "settings.minimumIntensity") }
+    }
+    @Published var eewForecastEnabled: Bool {
+        didSet { defaults.set(eewForecastEnabled, forKey: "settings.eewForecast") }
+    }
+    @Published var eewWarningEnabled: Bool {
+        didSet { defaults.set(eewWarningEnabled, forKey: "settings.eewWarning") }
+    }
+    @Published var tsunamiWarningEnabled: Bool {
+        didSet { defaults.set(tsunamiWarningEnabled, forKey: "settings.tsunamiWarning") }
+    }
+    @Published var tsunamiObservationsEnabled: Bool {
+        didSet { defaults.set(tsunamiObservationsEnabled, forKey: "settings.tsunamiObservations") }
+    }
+    @Published var nankaiEnabled: Bool {
+        didSet { defaults.set(nankaiEnabled, forKey: "settings.nankai") }
+    }
+    @Published var seismicAdvisoryEnabled: Bool {
+        didSet { defaults.set(seismicAdvisoryEnabled, forKey: "settings.seismicAdvisory") }
+    }
+    @Published var liveActivitiesEnabled: Bool {
+        didSet { defaults.set(liveActivitiesEnabled, forKey: "settings.liveActivities") }
+    }
+
     static let placeholderServerURL = "https://quake.example.jp/api/v1"
 
     private let defaults: UserDefaults
@@ -62,6 +93,16 @@ final class AppSettings: ObservableObject {
         tsunamiNotificationsEnabled = defaults.object(forKey: Key.tsunamiNotificationsEnabled) as? Bool ?? true
         advisoryNotificationsEnabled = defaults.object(forKey: Key.advisoryNotificationsEnabled) as? Bool ?? true
         eewNotificationsEnabled = defaults.object(forKey: Key.eewNotificationsEnabled) as? Bool ?? true
+        earthquakeRegionsText = defaults.string(forKey: "settings.earthquakeRegions") ?? ""
+        tsunamiRegionsText = defaults.string(forKey: "settings.tsunamiRegions") ?? ""
+        minimumIntensity = defaults.string(forKey: "settings.minimumIntensity") ?? ""
+        eewForecastEnabled = defaults.object(forKey: "settings.eewForecast") as? Bool ?? true
+        eewWarningEnabled = defaults.object(forKey: "settings.eewWarning") as? Bool ?? true
+        tsunamiWarningEnabled = defaults.object(forKey: "settings.tsunamiWarning") as? Bool ?? true
+        tsunamiObservationsEnabled = defaults.object(forKey: "settings.tsunamiObservations") as? Bool ?? true
+        nankaiEnabled = defaults.object(forKey: "settings.nankai") as? Bool ?? true
+        seismicAdvisoryEnabled = defaults.object(forKey: "settings.seismicAdvisory") as? Bool ?? true
+        liveActivitiesEnabled = defaults.object(forKey: "settings.liveActivities") as? Bool ?? false
     }
 
     var devicePreferences: DevicePreferences {
@@ -69,7 +110,11 @@ final class AppSettings: ObservableObject {
             notificationsEnabled: notificationsEnabled,
             timeSensitiveEnabled: timeSensitiveEnabled,
             customSoundEnabled: customSoundEnabled,
-            eventTypes: enabledEventTypes
+            eventTypes: enabledEventTypes,
+            earthquakeRegions: RegionSelection.parse(earthquakeRegionsText),
+            tsunamiRegions: RegionSelection.parse(tsunamiRegionsText),
+            minimumIntensity: minimumIntensity,
+            liveActivitiesEnabled: liveActivitiesEnabled
         )
     }
 
@@ -80,10 +125,18 @@ final class AppSettings: ObservableObject {
             types += [.earthquakeInfo, .earthquakeUpdate]
         }
         if eewNotificationsEnabled {
-            types += [.eewForecast, .eewWarning, .eewCancel]
+            if eewForecastEnabled { types += [.eewForecast] }
+            if eewWarningEnabled { types += [.eewWarning] }
+            if eewForecastEnabled || eewWarningEnabled { types += [.eewCancel] }
         }
-        if tsunamiNotificationsEnabled { types += [.tsunamiWarning, .tsunamiInfo] }
-        if advisoryNotificationsEnabled { types += [.nankaiInfo, .seismicAdvisory, .earthquakeData] }
+        if tsunamiNotificationsEnabled {
+            if tsunamiWarningEnabled { types += [.tsunamiWarning] }
+            if tsunamiObservationsEnabled { types += [.tsunamiInfo] }
+        }
+        if advisoryNotificationsEnabled {
+            if nankaiEnabled { types += [.nankaiInfo] }
+            if seismicAdvisoryEnabled { types += [.seismicAdvisory, .earthquakeData] }
+        }
         return types.map(\.rawValue)
     }
 
@@ -92,6 +145,18 @@ final class AppSettings: ObservableObject {
         timeSensitiveEnabled = preferences.timeSensitiveEnabled
         customSoundEnabled = preferences.customSoundEnabled
         let types = Set(preferences.eventTypes)
+        earthquakeRegionsText = (preferences.earthquakeRegions ?? []).joined(separator: "、")
+        tsunamiRegionsText = (preferences.tsunamiRegions ?? []).joined(separator: "、")
+        minimumIntensity = preferences.minimumIntensity ?? ""
+        if let enabled = preferences.liveActivitiesEnabled { liveActivitiesEnabled = enabled }
+        eewForecastEnabled = types.contains("eew_forecast")
+        eewWarningEnabled = types.contains("eew_warning")
+        if !needsExpandedPreferences {
+            tsunamiWarningEnabled = types.contains("tsunami_warning")
+            tsunamiObservationsEnabled = types.contains("tsunami_info")
+            nankaiEnabled = types.contains("nankai_info")
+            seismicAdvisoryEnabled = !types.isDisjoint(with: ["seismic_advisory", "earthquake_data"])
+        }
         if !needsExpandedPreferences {
             tsunamiNotificationsEnabled = !types.isDisjoint(with: ["tsunami_warning", "tsunami_info"])
             advisoryNotificationsEnabled = !types.isDisjoint(with: ["nankai_info", "seismic_advisory", "earthquake_data"])
@@ -105,5 +170,14 @@ final class AppSettings: ObservableObject {
             RelayEventType.eewWarning.rawValue,
             RelayEventType.eewCancel.rawValue
         ])
+    }
+}
+
+enum RegionSelection {
+    static func parse(_ text: String) -> [String] {
+        var seen = Set<String>()
+        return text.components(separatedBy: CharacterSet(charactersIn: "、,，\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 }

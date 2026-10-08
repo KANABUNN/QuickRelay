@@ -1,0 +1,54 @@
+package api
+
+import (
+	"net/http"
+	"time"
+)
+
+func (s *Server) liveStartToken(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		PushToken string `json:"push_token"`
+	}
+	if err := decode(w, r, &body); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.Store.RegisterLiveStartToken(r.Context(), id, body.PushToken, time.Now()); err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, 200, map[string]any{"ok": true})
+}
+func (s *Server) liveActivityToken(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		EventID      string `json:"event_id"`
+		TelegramType string `json:"telegram_type"`
+		ActivityID   string `json:"activity_id"`
+		PushToken    string `json:"push_token"`
+	}
+	if err := decode(w, r, &body); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.Store.RegisterLiveActivityToken(r.Context(), id, body.EventID, body.TelegramType, body.ActivityID, body.PushToken, time.Now()); err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, 200, map[string]any{"ok": true})
+}
+func (s *Server) liveActivityEnded(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		EventID      string `json:"event_id"`
+		TelegramType string `json:"telegram_type"`
+		ActivityID   string `json:"activity_id"`
+	}
+	if err := decode(w, r, &body); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.Store.EndLiveActivity(r.Context(), id, body.EventID, body.TelegramType, body.ActivityID); err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, 200, map[string]any{"ok": true})
+}

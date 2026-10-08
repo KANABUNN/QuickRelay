@@ -28,6 +28,7 @@ struct EventListView: View {
             }
         }
         .navigationTitle(title)
+        .safeAreaInset(edge: .top) { ReceiverStatusView() }
         .safeAreaInset(edge: .bottom) {
             if let error = repository.lastError {
                 Text(error)

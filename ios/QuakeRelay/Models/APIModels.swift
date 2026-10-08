@@ -176,6 +176,10 @@ struct DevicePreferences: Codable, Equatable, Sendable {
     var timeSensitiveEnabled: Bool
     var customSoundEnabled: Bool
     var eventTypes: [String]
+    var earthquakeRegions: [String]? = nil
+    var tsunamiRegions: [String]? = nil
+    var minimumIntensity: String? = nil
+    var liveActivitiesEnabled: Bool? = nil
 }
 
 struct DeviceRegistrationRequest: Encodable, Sendable {
@@ -209,6 +213,10 @@ struct PreferencesPatchRequest: Encodable, Sendable {
     let timeSensitiveEnabled: Bool?
     let customSoundEnabled: Bool?
     let eventTypes: [String]?
+    var earthquakeRegions: [String]? = nil
+    var tsunamiRegions: [String]? = nil
+    var minimumIntensity: String? = nil
+    var liveActivitiesEnabled: Bool? = nil
 }
 
 struct PreferencesResponse: Codable, Equatable, Sendable {
@@ -308,4 +316,36 @@ enum PublicationLabel {
         if cancelled { return "取消" }
         return infoType ?? "発表"
     }
+}
+
+struct SourceStatusDTO: Codable, Equatable, Sendable {
+    let connected: Bool
+    let lastFrameAt: String
+    let lastDataAt: String
+    let reconnects: UInt64
+    let rejected: UInt64
+}
+struct ReceiverStatusResponse: Codable, Equatable, Sendable {
+    let ok: Bool
+    let source: SourceStatusDTO
+    let sourceConfigured: Bool?
+    let sourceFresh: Bool?
+    let db: Bool?
+    let apnsConfigured: Bool
+    let serverTime: String?
+}
+struct NotificationTestDTO: Codable, Equatable, Sendable {
+    let id: String
+    let style: String
+    let status: String
+    let requestedAt: String
+}
+struct NotificationTestResponse: Codable, Equatable, Sendable {
+    let ok: Bool
+    let test: NotificationTestDTO
+    let cooldownSeconds: Int
+}
+struct NotificationTestRequest: Encodable, Sendable {
+    let requestId: String
+    let style: String
 }
