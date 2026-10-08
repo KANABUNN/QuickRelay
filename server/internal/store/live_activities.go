@@ -189,13 +189,27 @@ func (s *Store) RegisterLiveActivityToken(ctx context.Context, device, event, te
 	return tx.Commit()
 }
 
-func (s *Store) EndLiveActivity(ctx context.Context, device, event, telegram, activity string, dismissed bool) error {
+func (s *Store) EndLiveActivity(ctx context.Context, device, event, telegram, activity string, startSequence int64, dismissed bool) error {
+	if startSequence <= 0 || !ValidID(event) || !ValidID(activity) {
+		return ErrInvalid
+	}
 	state := "ended"
 	if dismissed {
 		state = "dismissed"
 	}
-	_, err := s.DB.ExecContext(ctx, "UPDATE live_activities SET state=CASE WHEN state='ended' THEN state ELSE ? END,token='' WHERE device_id=? AND event_id=? AND telegram_type=? AND activity_id=?",
-		state, device, event, telegram, activity)
+	// An end can arrive before the update-token upload. Match its start generation
+	// and bind the activity ID even in that gap. Terminal states stay terminal.
+	res, err := s.DB.ExecContext(ctx, `UPDATE live_activities SET state=CASE WHEN state IN ('ended','dismissed') THEN state ELSE ? END,
+        activity_id=CASE WHEN activity_id='' THEN ? ELSE activity_id END,token=''
+        WHERE device_id=? AND event_id=? AND telegram_type=? AND start_sequence=? AND (activity_id=? OR activity_id='')`,
+		state, activity, device, event, telegram, startSequence, activity)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err == nil && n == 0 {
+		return ErrInvalid
+	}
 	return err
 }
 

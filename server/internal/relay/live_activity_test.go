@@ -210,7 +210,7 @@ func TestLiveTokenGapCoalescesReportsAndCancelIsScoped(t *testing.T) {
 		t.Fatal("latest stream not recovered")
 	}
 	// A dismissed activity is not recreated by late token registration.
-	if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "activity1", true); err != nil {
+	if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "activity1", r.ServerSequence, true); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ServerSequence, newer.ReportedAt); err != store.ErrInvalid {
@@ -397,5 +397,74 @@ func TestTsunamiNewWarningDoesNotAcceptOldActivityGeneration(t *testing.T) {
 	}
 	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "newActivity", "aacc", renewed.ServerSequence, now); err != nil {
 		t.Fatal("new generation rejected", err)
+	}
+}
+
+func TestLiveActivityEndBeforeTokenUploadRetainsTerminalReason(t *testing.T) {
+	for _, dismissed := range []bool{false, true} {
+		name := "natural completion"
+		if dismissed {
+			name = "user dismissal"
+		}
+		t.Run(name, func(t *testing.T) {
+			st, w, _, r := setup(t)
+			ctx := context.Background()
+			r.EventID = "tsunami-gap"
+			r.TelegramType = "VTSE41"
+			r.Classification = "telegram.earthquake"
+			r.Category = "tsunami"
+			r.EventType = "tsunami_warning"
+			r.Warning = true
+			r.Serial = nil
+			enableLive(t, st, r)
+			r = ingestLive(t, st, r)
+			if _, err := w.Step(ctx); err != nil {
+				t.Fatal(err)
+			}
+			// The client closes before its update token reaches the server.
+			if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "earlyActivity", r.ServerSequence, dismissed); err != nil {
+				t.Fatal(err)
+			}
+			// A late natural-end callback must not erase a user dismissal.
+			if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "earlyActivity", r.ServerSequence, false); err != nil {
+				t.Fatal(err)
+			}
+			if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "earlyActivity", "eeff", r.ServerSequence, r.ReportedAt); err != store.ErrInvalid {
+				t.Fatal("late token resurrected ended activity", err)
+			}
+			record, err := st.LiveActivity(ctx, "phone", r.EventID, r.TelegramType)
+			expected := "ended"
+			if dismissed {
+				expected = "dismissed"
+			}
+			if err != nil || record.State != expected {
+				t.Fatal(record, err)
+			}
+			newer := r
+			newer.ID, newer.MessageID = "new-warning", "new-warning"
+			newer.ReportedAt = r.ReportedAt.Add(time.Second)
+			newer.ReceivedAt = newer.ReportedAt
+			newer = ingestLive(t, st, newer)
+			token, err := st.ReserveLiveStart(ctx, "phone", newer, newer.ReportedAt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if dismissed {
+				if token != "" {
+					t.Fatal("user-dismissed activity was recreated")
+				}
+			} else {
+				if token != "ccdd" {
+					t.Fatal("new warning cannot start after natural completion")
+				}
+				if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "earlyActivity", r.ServerSequence, false); err != store.ErrInvalid {
+					t.Fatal("old end callback accepted by new generation", err)
+				}
+				current, _ := st.LiveActivity(ctx, "phone", newer.EventID, newer.TelegramType)
+				if current.State != "starting" {
+					t.Fatal("old callback ended new activity")
+				}
+			}
+		})
 	}
 }

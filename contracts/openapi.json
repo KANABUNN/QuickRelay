@@ -1290,7 +1290,8 @@
                 "required": [
                   "event_id",
                   "telegram_type",
-                  "activity_id"
+                  "activity_id",
+                  "start_sequence"
                 ],
                 "properties": {
                   "event_id": {
@@ -1311,6 +1312,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "True only when the user dismisses an active activity; natural completion may allow a later tsunami warning."
+                  },
+                  "start_sequence": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Start generation carried in the activity attributes; rejects late end callbacks from earlier activities."
                   }
                 }
               }

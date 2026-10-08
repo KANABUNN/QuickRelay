@@ -39,16 +39,17 @@ func (s *Server) liveActivityToken(w http.ResponseWriter, r *http.Request, id st
 }
 func (s *Server) liveActivityEnded(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
-		EventID      string `json:"event_id"`
-		TelegramType string `json:"telegram_type"`
-		ActivityID   string `json:"activity_id"`
-		Dismissed    bool   `json:"dismissed"`
+		EventID       string `json:"event_id"`
+		TelegramType  string `json:"telegram_type"`
+		ActivityID    string `json:"activity_id"`
+		StartSequence int64  `json:"start_sequence"`
+		Dismissed     bool   `json:"dismissed"`
 	}
 	if err := decode(w, r, &body); err != nil {
 		fail(w, err)
 		return
 	}
-	if err := s.Store.EndLiveActivity(r.Context(), id, body.EventID, body.TelegramType, body.ActivityID, body.Dismissed); err != nil {
+	if err := s.Store.EndLiveActivity(r.Context(), id, body.EventID, body.TelegramType, body.ActivityID, body.StartSequence, body.Dismissed); err != nil {
 		fail(w, err)
 		return
 	}
