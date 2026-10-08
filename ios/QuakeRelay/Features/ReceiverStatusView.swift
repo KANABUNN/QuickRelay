@@ -45,7 +45,7 @@ struct ReceiverStatusView: View {
             }
             .padding(.horizontal).padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial)
+            .background(.thinMaterial, ignoresSafeAreaEdges: [])
         }
     }
 }

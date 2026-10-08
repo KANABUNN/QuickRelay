@@ -30,7 +30,9 @@ final class NotificationsUITests: XCTestCase {
                 XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
             case "background":
                 XCUIDevice.shared.press(.home)
-                XCTAssertTrue(app.wait(for: .runningBackground, timeout: 5))
+                XCTAssertTrue(app.wait(for: .runningBackground, timeout: 5)
+                    || app.state == .runningBackgroundSuspended,
+                    "The app must be backgrounded before the simulated push")
             default:
                 app.terminate()
                 XCTAssertEqual(app.state, .notRunning)
@@ -65,13 +67,36 @@ final class NotificationsUITests: XCTestCase {
         guard app.tabBars.buttons["津波"].waitForExistence(timeout: 15) else {
             XCTFail("Loopback pairing did not complete"); return
         }
+        assertListTitle("地震", in: app)
+        try await action("capture/earthquake-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         let ordinary = app.staticTexts["合成震源・通常情報"]
         XCTAssertTrue(ordinary.waitForExistence(timeout: 10))
         ordinary.tap()
         XCTAssertTrue(app.staticTexts["発表区分"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["第9報"].exists)
+        let observations = app.buttons["intensityObservations"]
+        for _ in 0..<6 {
+            if observations.exists && observations.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(observations.exists && observations.isHittable, "Observation list button missing")
+        let station = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "合成観測地点01")).firstMatch
+        XCTAssertFalse(station.exists, "Observations must not be shown in the main detail")
         try await action("capture/ordinary", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        observations.tap()
+        let close = app.buttons["closeIntensityObservations"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "Observation sheet did not open")
+        if !station.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(station.waitForExistence(timeout: 5), "Observation sheet should show saved stations")
+        try await action("capture/intensity-popup", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        close.tap()
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: station)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
+        XCTAssertTrue(observations.isHittable, "Closing the sheet should return to the detail")
+        try await action("capture/intensity-dismissed", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         app.tabBars.buttons["津波"].tap()
+        assertListTitle("津波", in: app)
+        try await action("capture/tsunami-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         let tsunami = app.staticTexts["合成津波警報"].firstMatch
         XCTAssertTrue(tsunami.waitForExistence(timeout: 10))
         tsunami.tap()
@@ -83,6 +108,8 @@ final class NotificationsUITests: XCTestCase {
         XCTAssertTrue(height.waitForExistence(timeout: 5))
         try await action("capture/tsunami", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         app.tabBars.buttons["関連情報"].tap()
+        assertListTitle("関連情報", in: app)
+        try await action("capture/advisory-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         let advisory = app.staticTexts["合成南海トラフ情報"].firstMatch
         XCTAssertTrue(advisory.waitForExistence(timeout: 10))
         advisory.tap()
@@ -98,15 +125,33 @@ final class NotificationsUITests: XCTestCase {
         }
         XCTAssertTrue(live.exists, "Live Activity preference missing")
         try await action("capture/notification-settings", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
-        let test = app.buttons["sendNotificationTest"]
-        for _ in 0..<6 {
-            if test.exists && test.isHittable { break }
-            app.swipeUp()
+        for name in ["地震の通知対象地域", "津波の通知対象地域"] {
+            let field = app.textFields[name]
+            scrollTo(field, in: app)
+            XCTAssertTrue(field.exists && field.isHittable, "Region input missing: \(name)")
         }
-        XCTAssertTrue(app.textFields["地震の通知対象地域"].exists)
-        XCTAssertTrue(app.textFields["津波の通知対象地域"].exists)
-        XCTAssertTrue(test.exists, "Own-device notification test control missing")
+        let test = app.buttons["sendNotificationTest"]
+        scrollTo(test, in: app)
+        XCTAssertTrue(test.exists && test.isHittable, "Own-device notification test control missing")
         try await action("capture/notification-test", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+    }
+
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<10 {
+            if element.exists && element.isHittable { return }
+            let start = app.coordinate(withNormalizedOffset: .init(dx: 0.5, dy: 0.75))
+            let end = app.coordinate(withNormalizedOffset: .init(dx: 0.5, dy: 0.45))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+    }
+
+    private func assertListTitle(_ title: String, in app: XCUIApplication) {
+        let heading = app.navigationBars.staticTexts[title].firstMatch
+        XCTAssertTrue(heading.waitForExistence(timeout: 5), "Navigation title missing: \(title)")
+        XCTAssertTrue(heading.isHittable, "Navigation title is obscured: \(title)")
+        let status = app.descendants(matching: .any).matching(identifier: "receiverStatus").firstMatch
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(heading.frame.maxY, status.frame.minY, "Receiver status overlaps the title")
     }
 
     private func action(_ path: String, at base: URL, body: Data? = nil) async throws {
