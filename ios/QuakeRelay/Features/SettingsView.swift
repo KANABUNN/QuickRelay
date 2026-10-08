@@ -73,12 +73,18 @@ struct SettingsView: View {
             }
 
             Section {
-                TextField("例：石川県、宮崎県", text: $settings.earthquakeRegionsText)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .accessibilityLabel("地震の通知対象地域")
-                TextField("例：宮崎県、石川県加賀", text: $settings.tsunamiRegionsText)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .accessibilityLabel("津波の通知対象地域")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("地震の地域").font(.caption).foregroundStyle(.secondary)
+                    TextField("例：石川県、宮崎県", text: $settings.earthquakeRegionsText)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityLabel("地震の通知対象地域")
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("津波の地域").font(.caption).foregroundStyle(.secondary)
+                    TextField("例：宮崎県、石川県加賀", text: $settings.tsunamiRegionsText)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityLabel("津波の通知対象地域")
+                }
                 Picker("地震・EEW予報の最低震度", selection: $settings.minimumIntensity) {
                     Text("指定なし").tag("")
                     ForEach(["1","2","3","4","5-","5+","6-","6+","7"], id: \.self) { value in
