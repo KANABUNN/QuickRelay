@@ -234,19 +234,29 @@ private struct BulletinContent: View {
     @State private var exporting = false
     @State private var loading = false
     @State private var error: String?
+    @State private var showingIntensityObservations = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let sections = Array((bulletin.sections ?? []).enumerated())
+        let observations = sections.filter { $0.element.isIntensityObservation }
+        return VStack(alignment: .leading, spacing: 12) {
             if let headline = bulletin.headline, !headline.isEmpty {
                 Text(headline).font(.subheadline).textSelection(.enabled)
             }
-            ForEach(Array((bulletin.sections ?? []).enumerated()), id: \.offset) { _, section in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(section.title).font(.subheadline.bold())
-                    if let text = section.text { Text(text).textSelection(.enabled) }
-                    ForEach(Array((section.rows ?? []).enumerated()), id: \.offset) { _, row in
-                        LabeledContent(row.label, value: row.value)
+            ForEach(sections, id: \.offset) { offset, section in
+                if section.isIntensityObservation {
+                    if offset == observations.first?.offset {
+                        Button {
+                            showingIntensityObservations = true
+                        } label: {
+                            Label("各地の震度を見る（\(observations.count)地域・地点）", systemImage: "list.bullet")
+                                .font(.subheadline)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("intensityObservations")
                     }
+                } else {
+                    sectionContent(section)
                 }
             }
             if let document = bulletin.document {
@@ -274,6 +284,57 @@ private struct BulletinContent: View {
         .fileExporter(isPresented: $exporting, document: file, contentType: .data,
                       defaultFilename: "\(reportID).\(bulletin.document?.fileExtension ?? "bin")") { result in
             if case let .failure(failure) = result { error = failure.localizedDescription }
+        }
+        .sheet(isPresented: $showingIntensityObservations) {
+            IntensityObservationsView(sections: observations.map(\.element))
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func sectionContent(_ section: BulletinSectionDTO) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(section.title).font(.subheadline.bold())
+            if let text = section.text { Text(text).textSelection(.enabled) }
+            ForEach(Array((section.rows ?? []).enumerated()), id: \.offset) { _, row in
+                LabeledContent(row.label, value: row.value)
+            }
+        }
+    }
+}
+
+private extension BulletinSectionDTO {
+    var isIntensityObservation: Bool {
+        title.hasPrefix("観測") && rows?.contains {
+            $0.label == "震度" || $0.label == "最大震度"
+        } == true
+    }
+}
+
+private struct IntensityObservationsView: View {
+    let sections: [BulletinSectionDTO]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                    Section(section.title) {
+                        if let text = section.text { Text(text).textSelection(.enabled) }
+                        ForEach(Array((section.rows ?? []).enumerated()), id: \.offset) { _, row in
+                            LabeledContent(row.label, value: row.value)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("各地の震度")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("閉じる") { dismiss() }
+                        .accessibilityIdentifier("closeIntensityObservations")
+                }
+            }
         }
     }
 }

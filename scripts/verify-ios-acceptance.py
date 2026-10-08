@@ -77,7 +77,12 @@ def frames():
     extras = [
         ('VXSE53', 'earthquake-information', '20261005000002', '震源・震度情報',
          {'earthquake': {'originTime': at.isoformat(), 'hypocenter': {'name': '合成震源・通常情報'},
-                         'magnitude': {'value': '5.0'}}, 'intensity': {'maxInt': '3'}}),
+                         'magnitude': {'value': '5.0'}}, 'intensity': {'maxInt': '4',
+             'prefectures': [{'name': '合成県', 'maxInt': '4', 'regions': [
+                 {'name': '合成地方', 'maxInt': '4', 'cities': [
+                     {'name': '合成市', 'maxInt': '4', 'stations': [
+                         {'name': f'合成観測地点{i:02d}', 'int': '4' if i == 1 else '3'}
+                         for i in range(1, 21)]}]}]}]}}),
         ('VTSE41', 'tsunami-information', '20261005000002 20261005000003', '合成津波警報',
          {'tsunami': {'forecasts': [{'code': '999', 'name': '合成予報区',
              'kind': {'code': '53', 'name': '大津波警報', 'lastKind': {'code': '00', 'name': 'なし'}},
@@ -140,7 +145,7 @@ def notification_control(simulator, evidence):
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
                 command(['xcrun', 'simctl', 'push', simulator, 'jp.kb-dev.quickrelay', str(path)], timeout=30)
                 injections.append(state)
-            elif self.path in ['/capture/' + state for state in ('launched', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
+            elif self.path in ['/capture/' + state for state in ('launched', 'earthquake-list', 'tsunami-list', 'advisory-list', 'intensity-popup', 'intensity-dismissed', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
                 state = self.path.rsplit('/', 1)[1]
                 try:
                     size = int(self.headers.get('Content-Length', '0'))
@@ -306,6 +311,7 @@ def main():
             summary['simulator_to_public_vps'] = 'passed_read_only' if live else 'not_tested'
             ui_code = re.search(r'\b[0-9]{8}\b', command([str(binary), 'pair'], env=env)).group()
             # UI tests grant permission, assert visible notifications, and tap each banner.
+            command(['xcrun', 'simctl', 'ui', simulator, 'appearance', 'dark'], timeout=30)
             with notification_control(simulator, evidence) as (control, injections, captures):
                 config = plistlib.loads(files[0].read_bytes())
                 assert configure_tests(config, {'QUAKERELAY_ACCEPTANCE_CONTROL_URL': control,
@@ -322,7 +328,10 @@ def main():
                 finally:
                     test_run.unlink()
                 assert injections == ['foreground', 'background', 'terminated']
-                assert captures == ['launched', 'foreground', 'background', 'terminated', 'ordinary', 'tsunami', 'advisory', 'notification-settings', 'notification-test']
+                assert captures == ['launched', 'foreground', 'background', 'terminated',
+                    'earthquake-list', 'ordinary', 'intensity-popup', 'intensity-dismissed',
+                    'tsunami-list', 'tsunami', 'advisory-list', 'advisory',
+                    'notification-settings', 'notification-test']
         finally:
             if relay.poll() is None:
                 relay.terminate()

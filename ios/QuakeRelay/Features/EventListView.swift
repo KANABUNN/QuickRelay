@@ -11,24 +11,12 @@ struct EventListView: View {
     @Query(sort: \EventEntity.latestReportAt, order: .reverse) private var events: [EventEntity]
 
     var body: some View {
-        Group {
-            if categoryEvents.isEmpty {
-                ContentUnavailableView(
-                    "\(title)の受信履歴はありません",
-                    systemImage: "waveform.path.ecg",
-                    description: Text("下へ引いてサーバーと同期できます。")
-                )
-            } else {
-                List(categoryEvents) { event in
-                    NavigationLink(value: AppRoute.event(id: event.id, reportID: nil)) {
-                        EventRow(event: event)
-                    }
-                }
-                .listStyle(.plain)
-            }
+        VStack(spacing: 0) {
+            ReceiverStatusView()
+            listContent
         }
         .navigationTitle(title)
-        .safeAreaInset(edge: .top) { ReceiverStatusView() }
+        .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
             if let error = repository.lastError {
                 Text(error)
@@ -49,6 +37,25 @@ struct EventListView: View {
                         Task { _ = await repository.syncAll() }
                     }
                 }
+            }
+        }
+    }
+
+    private var listContent: some View {
+        Group {
+            if categoryEvents.isEmpty {
+                ContentUnavailableView(
+                    "\(title)の受信履歴はありません",
+                    systemImage: "waveform.path.ecg",
+                    description: Text("下へ引いてサーバーと同期できます。")
+                )
+            } else {
+                List(categoryEvents) { event in
+                    NavigationLink(value: AppRoute.event(id: event.id, reportID: nil)) {
+                        EventRow(event: event)
+                    }
+                }
+                .listStyle(.plain)
             }
         }
         .refreshable {
