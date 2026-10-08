@@ -60,6 +60,7 @@
         AA1000000000000000000002 /* QuickRelayActivityAttributes.swift in Sources */ = {isa=PBXBuildFile; fileRef=105D8951174E07CEF05244AC;};
         AA1000000000000000000003 /* QuickRelayLiveActivity.appex in Embed App Extensions */ = {isa=PBXBuildFile; fileRef=FA1000000000000000000003; settings={ATTRIBUTES=(RemoveHeadersOnCopy,);};};
         AA1000000000000000000004 /* PrivacyInfo.xcprivacy in Resources */ = {isa=PBXBuildFile; fileRef=FA1000000000000000000004;};
+		7CF1FBD9F28A9D1CAE52EB24 /* live-activity.valid.json in Resources */ = {isa=PBXBuildFile;fileRef=AD6DD0FDDA7D9E3620CB1A07;};
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -135,6 +136,7 @@
         FA1000000000000000000002 /* Info.plist */ = {isa=PBXFileReference; lastKnownFileType=text.plist.xml; path=Info.plist; sourceTree="<group>";};
         FA1000000000000000000003 /* QuickRelayLiveActivity.appex */ = {isa=PBXFileReference; explicitFileType="wrapper.app-extension"; includeInIndex=0; path=QuickRelayLiveActivity.appex; sourceTree=BUILT_PRODUCTS_DIR;};
         FA1000000000000000000004 /* PrivacyInfo.xcprivacy */ = {isa=PBXFileReference; lastKnownFileType=text.xml; path="../QuakeRelay/Resources/PrivacyInfo.xcprivacy"; sourceTree="<group>";};
+		AD6DD0FDDA7D9E3620CB1A07 /* live-activity.valid.json */ = {isa=PBXFileReference;lastKnownFileType=text.json;path="../../contracts/examples/live-activity.valid.json";sourceTree="<group>";};
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -228,6 +230,7 @@
 		000000000000000000000005 /* QuakeRelayTests */ = {
 			isa = PBXGroup;
 			children = (
+				AD6DD0FDDA7D9E3620CB1A07 /* live-activity.valid.json */,
 				3EBA60FE3E4BC09BEB197076 /* PriorityFeaturesTests.swift */,
 				F00000000000000000000020 /* TestFixtures.swift */,
 				F00000000000000000000021 /* APIDecodingTests.swift */,
@@ -396,6 +399,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7CF1FBD9F28A9D1CAE52EB24 /* live-activity.valid.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

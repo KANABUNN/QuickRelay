@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import SwiftUI
 
 // Both the application and WidgetKit extension compile this type. ActivityKit
 // uses the default Codable keys, not the REST API's snake_case strategy.
@@ -34,5 +35,39 @@ struct QuickRelayActivityAttributes: ActivityAttributes {
         guard !eventID.isEmpty,
               eventID.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-").contains($0) }) else { return nil }
         return URL(string: "quake-relay://event/\(eventID)")
+    }
+}
+
+// Shared with the widget so layout tests measure the actual Lock Screen card.
+struct QuickRelayLiveActivityCard: View {
+    let state: QuickRelayActivityAttributes.ContentState
+    let isStale: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Label("Quick Relay", systemImage: state.symbol).font(.caption.weight(.semibold))
+                Spacer()
+                Text(state.reportLabel).font(.caption).lineLimit(1)
+            }
+            Text(state.title).font(.headline).lineLimit(1).minimumScaleFactor(0.85)
+            if !state.intensityText.isEmpty {
+                Text(state.intensityText).font(.headline).lineLimit(1)
+            }
+            Text(state.summary).font(.caption).lineLimit(1)
+            Text(state.freshnessLabel(isStale: isStale))
+                .font(.caption.weight(.semibold)).lineLimit(2)
+                .foregroundStyle(isStale && !state.ended ? .orange : .secondary)
+            HStack {
+                Text("発表")
+                Text(Date(timeIntervalSince1970: TimeInterval(state.reportedAt)), style: .time)
+                Spacer()
+                Text("タップして詳細")
+            }.font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .padding(14)
+        // The system can truncate Live Activities beyond 160 points. Keep the
+        // compact card readable, with full text available through its detail URL.
+        .dynamicTypeSize(...DynamicTypeSize.large)
     }
 }

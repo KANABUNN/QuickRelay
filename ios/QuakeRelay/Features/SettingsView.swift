@@ -42,6 +42,7 @@ struct SettingsView: View {
                     Toggle("その他の地震関連情報", isOn: $settings.seismicAdvisoryEnabled)
                 }
                 Toggle("Live Activity", isOn: $settings.liveActivitiesEnabled)
+                    .accessibilityIdentifier("liveActivityToggle")
                     .disabled(!settings.notificationsEnabled || !liveActivities.supportsRemoteStart)
                 Text(liveActivities.statusText).font(.caption).foregroundStyle(.secondary)
                 Text("iOS 17.2以降で、EEW予報・津波警報や注意報の続報をロック画面に表示します。開始時の通知と通常通知は兼用し、以降の表示更新は無音です。情報が古くなると未確認と表示します。")

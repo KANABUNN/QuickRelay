@@ -119,6 +119,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: QuakeRelayTests
+    resources:
+      - path: ../contracts/examples/live-activity.valid.json
     dependencies:
       - target: QuakeRelay
     settings:

@@ -10,28 +10,7 @@ struct QuickRelayLiveActivityBundle: WidgetBundle {
 struct QuickRelayLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: QuickRelayActivityAttributes.self) { context in
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Label("Quick Relay", systemImage: context.state.symbol).font(.caption.weight(.semibold))
-                    Spacer()
-                    Text(context.state.reportLabel).font(.caption)
-                }
-                Text(context.state.title).font(.headline).lineLimit(2)
-                if !context.state.intensityText.isEmpty {
-                    Text(context.state.intensityText).font(.title3.bold())
-                }
-                Text(context.state.summary).font(.caption).lineLimit(3)
-                Text(context.state.freshnessLabel(isStale: context.isStale))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(context.isStale && !context.state.ended ? .orange : .secondary)
-                HStack {
-                    Text("発表")
-                    Text(Date(timeIntervalSince1970: TimeInterval(context.state.reportedAt)), style: .time)
-                    Spacer()
-                    Text("タップして詳細").font(.caption2)
-                }.font(.caption2).foregroundStyle(.secondary)
-            }
-            .padding(12)
+            QuickRelayLiveActivityCard(state: context.state, isStale: context.isStale)
             .activityBackgroundTint(Color(.secondarySystemBackground))
             .activitySystemActionForegroundColor(.primary)
             .widgetURL(context.attributes.detailURL)

@@ -1,4 +1,6 @@
 import XCTest
+import SwiftUI
+import UIKit
 @testable import QuakeRelay
 
 @MainActor
@@ -47,9 +49,8 @@ final class PriorityFeaturesTests: XCTestCase {
         XCTAssertNil(p.earthquakeRegions)
     }
     func testActualServerActivityFixtureDecodesAsActivityKitContent() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        let data = try Data(contentsOf: root.appendingPathComponent("contracts/examples/live-activity.valid.json"))
+        let resource = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "live-activity.valid", withExtension: "json"))
+        let data = try Data(contentsOf: resource)
         let payload = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         let aps = payload["aps"] as! [String: Any]
         let state = try JSONDecoder().decode(QuickRelayActivityAttributes.ContentState.self,
@@ -60,6 +61,27 @@ final class PriorityFeaturesTests: XCTestCase {
         XCTAssertEqual(state.intensityText, "最大震度 5弱")
         XCTAssertEqual(attributes.startSequence, 1)
         XCTAssertEqual(attributes.eventID, "20261005000000")
+    }
+    func testLockScreenCardFitsSystemHeightAndRendersLongStaleContent() throws {
+        let state = QuickRelayActivityAttributes.ContentState(
+            title: "緊急地震速報（予報）第20報・長い表示タイトルの合成確認",
+            summary: "仮定震源の参考値です。実際の震源要素を示す値ではありません。",
+            statusText: "続報を待機", intensityText: "最大震度 6強", reportLabel: "第20報",
+            category: "earthquake", warning: true, ended: false, cancelled: false,
+            reportedAt: 1791414000, updatedAt: 1791414001)
+        for width in [320.0, 371.0, 408.0] {
+            let view = QuickRelayLiveActivityCard(state: state, isStale: true)
+            let host = UIHostingController(rootView: view)
+            let size = host.sizeThatFits(in: CGSize(width: width, height: 1000))
+            XCTAssertLessThanOrEqual(size.height, 160, "Lock Screen card would be clipped")
+            let renderer = ImageRenderer(content: view.frame(width: width))
+            renderer.scale = 2
+            let image = try XCTUnwrap(renderer.uiImage)
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "Live Activity stale card \(Int(width))pt"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
     }
     func testActivityContentUsesDefaultCodableKeysAndStaleIsNotAnAllClear() throws {
         let data = #"{"title":"緊急地震速報","summary":"仮定値","statusText":"続報を待機","intensityText":"最大震度 5弱","reportLabel":"第2報","category":"earthquake","warning":true,"ended":false,"cancelled":false,"reportedAt":1791414000,"updatedAt":1791414001}"#.data(using: .utf8)!

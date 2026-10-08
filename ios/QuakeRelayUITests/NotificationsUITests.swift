@@ -91,7 +91,7 @@ final class NotificationsUITests: XCTestCase {
         XCTAssertTrue(text.waitForExistence(timeout: 5))
         try await action("capture/advisory", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         app.tabBars.buttons["設定"].tap()
-        let live = app.switches["Live Activity"].firstMatch
+        let live = app.switches["liveActivityToggle"].firstMatch
         for _ in 0..<6 {
             if live.exists && live.isHittable { break }
             app.swipeUp()

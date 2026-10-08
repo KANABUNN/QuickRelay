@@ -140,7 +140,7 @@ def notification_control(simulator, evidence):
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
                 command(['xcrun', 'simctl', 'push', simulator, 'jp.kb-dev.quickrelay', str(path)], timeout=30)
                 injections.append(state)
-            elif self.path in ['/capture/' + state for state in ('launched', 'tsunami', 'advisory', 'ordinary') + states]:
+            elif self.path in ['/capture/' + state for state in ('launched', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
                 state = self.path.rsplit('/', 1)[1]
                 try:
                     size = int(self.headers.get('Content-Length', '0'))
@@ -322,7 +322,7 @@ def main():
                 finally:
                     test_run.unlink()
                 assert injections == ['foreground', 'background', 'terminated']
-                assert captures == ['launched', 'foreground', 'background', 'terminated', 'ordinary', 'tsunami', 'advisory']
+                assert captures == ['launched', 'foreground', 'background', 'terminated', 'ordinary', 'tsunami', 'advisory', 'notification-settings', 'notification-test']
         finally:
             if relay.poll() is None:
                 relay.terminate()
