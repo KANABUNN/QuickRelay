@@ -30,7 +30,9 @@ final class NotificationsUITests: XCTestCase {
                 XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
             case "background":
                 XCUIDevice.shared.press(.home)
-                XCTAssertTrue(app.wait(for: .runningBackground, timeout: 5))
+                XCTAssertTrue(app.wait(for: .runningBackground, timeout: 5)
+                    || app.state == .runningBackgroundSuspended,
+                    "The app must be backgrounded before the simulated push")
             default:
                 app.terminate()
                 XCTAssertEqual(app.state, .notRunning)
