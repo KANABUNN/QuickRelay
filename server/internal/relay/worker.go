@@ -75,6 +75,10 @@ func (w *Worker) Step(ctx context.Context) (bool, error) {
 	finish := func(status, reason string, next time.Time) (bool, error) {
 		return true, w.Store.Finish(ctx, *d, status, reason, next)
 	}
+	// Also reject legacy jobs queued by a previous binary before the upgrade.
+	if !d.Report.PushEligible() {
+		return finish("skipped", "history_only_product", now)
+	}
 	device, err := w.Store.Device(ctx, d.DeviceID)
 	if err != nil {
 		return true, err

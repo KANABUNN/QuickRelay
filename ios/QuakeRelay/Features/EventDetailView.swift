@@ -133,7 +133,7 @@ struct EventDetailView: View {
     }
 
     private var sortedReports: [ReportEntity] {
-        reports.sorted(by: ReportTimelineOrder.areInAscendingOrder)
+        ReportTimelineDisplay.visible(reports).sorted(by: ReportTimelineOrder.areInAscendingOrder)
     }
 
     private var latestReport: ReportEntity? {

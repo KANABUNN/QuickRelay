@@ -15,6 +15,17 @@ final class ReportTimelineTests: XCTestCase {
         return ReportEntity(dto: dto, serverSequence: sequence)
     }
 
+    func testTimelineHidesLegacyDuplicatesButKeepsWarningsAndOtherEvents() {
+        let legacy = sourceReport(sequence: 1, revision: 99, type: "VXSE44")
+        let modern = sourceReport(sequence: 2, revision: 1)
+        let warning = sourceReport(sequence: 3, revision: 1, type: "VXSE43")
+        let cancel = sourceReport(sequence: 4, revision: 1, cancelled: true)
+        let otherLegacy = sourceReport(sequence: 5, revision: 1, type: "VXSE44", eventID: "other")
+        let visible = ReportTimelineDisplay.visible([legacy, modern, warning, cancel, otherLegacy])
+        XCTAssertEqual(visible.map(\.id), [modern.id, warning.id, cancel.id, otherLegacy.id])
+        XCTAssertEqual(ReportTimelineDisplay.visible([legacy]).map(\.id), [legacy.id])
+    }
+
     func testForecastReferenceRejectsOlderRevisionAndOtherEventOrProduct() {
         let latest = sourceReport(sequence: 2, revision: 3)
         let reports = [sourceReport(sequence: 1, revision: 1), latest,

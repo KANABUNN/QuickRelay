@@ -50,3 +50,15 @@ Goは契約対象20種、訓練除外、訂正・取消・解除、高さの修�
 合成試験は各種の実電文やAPNsのiPhone到達を確認したものではありません。
 
 参考：[電文一覧](https://dmdata.jp/docs/telegrams/)、[Socket Start](https://dmdata.jp/docs/reference/api/v2/socket.start/)、[WebSocket](https://dmdata.jp/docs/reference/api/v2/websocket/)、[津波JSON](https://dmdata.jp/docs/reference/conversion/json/schema/tsunami-information/)、[南海トラフJSON](https://dmdata.jp/docs/reference/conversion/json/schema/earthquake-nankai/)。
+
+
+## EEW予報の二重通知の防止
+
+DMDATAは旧形式VXSE44と後継VXSE45を同じ報について配信します。
+受信と認証付き履歴保存は両方を継続し、自動通知はVXSE45のみを使います。
+VXSE44だけを受信した場合も自動通知へ切り替えません。
+iOSの通常の発表履歴は同じイベントでVXSE45を受信済みならVXSE44を非表示にし、
+警報VXSE43とVXSE45の取消・最終報は残します。異なる製品の報番号は比較しません。
+旧版が作成した未送信VXSE44ジョブも送信前に除外します。
+
+根拠: [DMDATAのEEW配信仕様](https://dmdata.jp/docs/eew/)。

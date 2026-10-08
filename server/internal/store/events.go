@@ -89,8 +89,20 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 			}
 			visible = old.TelegramType == r.TelegramType || r.ReportedAt.After(old.LatestReportAt) ||
 				r.ReportedAt.Equal(old.LatestReportAt) && (r.Cancelled || r.Warning && !old.Warning)
+			// Prefer the replacement forecast product without comparing serials
+			// between VXSE44 and VXSE45. Warning publications remain independent.
+			if r.TelegramType == "VXSE45" && old.TelegramType == "VXSE44" {
+				visible = true
+			}
 		} else if !visible {
 			return out, err
+		}
+		if r.TelegramType == "VXSE44" {
+			var modern int
+			if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM streams WHERE event_id=? AND telegram_type='VXSE45'", r.EventID).Scan(&modern); err != nil {
+				return out, err
+			}
+			visible = visible && modern == 0
 		}
 		if visible {
 			eventBytes, _ := json.Marshal(r.Event())
