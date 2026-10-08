@@ -1306,6 +1306,11 @@
                   "activity_id": {
                     "type": "string",
                     "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  },
+                  "dismissed": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "True only when the user dismisses an active activity; natural completion may allow a later tsunami warning."
                   }
                 }
               }

@@ -210,7 +210,7 @@ func TestLiveTokenGapCoalescesReportsAndCancelIsScoped(t *testing.T) {
 		t.Fatal("latest stream not recovered")
 	}
 	// A dismissed activity is not recreated by late token registration.
-	if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "activity1"); err != nil {
+	if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "activity1", true); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ServerSequence, newer.ReportedAt); err != store.ErrInvalid {

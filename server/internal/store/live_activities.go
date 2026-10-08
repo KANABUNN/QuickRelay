@@ -189,9 +189,13 @@ func (s *Store) RegisterLiveActivityToken(ctx context.Context, device, event, te
 	return tx.Commit()
 }
 
-func (s *Store) EndLiveActivity(ctx context.Context, device, event, telegram, activity string) error {
-	_, err := s.DB.ExecContext(ctx, "UPDATE live_activities SET state=CASE WHEN state='ended' THEN state ELSE 'dismissed' END,token='' WHERE device_id=? AND event_id=? AND telegram_type=? AND activity_id=?",
-		device, event, telegram, activity)
+func (s *Store) EndLiveActivity(ctx context.Context, device, event, telegram, activity string, dismissed bool) error {
+	state := "ended"
+	if dismissed {
+		state = "dismissed"
+	}
+	_, err := s.DB.ExecContext(ctx, "UPDATE live_activities SET state=CASE WHEN state='ended' THEN state ELSE ? END,token='' WHERE device_id=? AND event_id=? AND telegram_type=? AND activity_id=?",
+		state, device, event, telegram, activity)
 	return err
 }
 

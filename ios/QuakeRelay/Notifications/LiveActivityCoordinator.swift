@@ -106,7 +106,7 @@ final class LiveActivityCoordinator: ObservableObject {
                     guard let self, !Task.isCancelled else { return }
                     if state == .dismissed || state == .ended {
                         self.queueUpload(key: "end:\(activity.id)") { [registrar = self.registrar] in
-                            try await registrar.ended(attributes: activity.attributes, activityID: activity.id)
+                            try await registrar.ended(attributes: activity.attributes, activityID: activity.id,dismissed: state == .dismissed)
                         }
                         self.tokenObservers.removeValue(forKey: activity.id)?.cancel()
                         self.uploads.removeValue(forKey: activity.id)?.cancel()

@@ -309,8 +309,14 @@ extension APIClient {
         let _: SuccessResponse = try await request(path: "devices/me/live-activity/token",
                                                    method: "PUT", body: body, authentication: .device)
     }
-    func liveActivityEnded(eventID: String, telegramType: String, activityID: String) async throws {
-        let body = try encoder.encode(["event_id": eventID, "telegram_type": telegramType, "activity_id": activityID])
+    func liveActivityEnded(eventID: String, telegramType: String, activityID: String, dismissed: Bool) async throws {
+        struct End: Encodable {
+            let eventId: String
+            let telegramType: String
+            let activityId: String
+            let dismissed: Bool
+        }
+        let body = try encoder.encode(End(eventId: eventID, telegramType: telegramType, activityId: activityID, dismissed: dismissed))
         let _: SuccessResponse = try await request(path: "devices/me/live-activity/ended",
                                                    method: "POST", body: body, authentication: .device)
     }
