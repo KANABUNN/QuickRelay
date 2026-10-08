@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"quakerelay/server/internal/model"
 )
@@ -53,6 +54,16 @@ func TestSharedContractExamples(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertJSON(read("push-payload.valid.json"), payload)
+	live, err := LivePayload(report, model.DefaultPreferences(), "start", time.Date(2026, 10, 5, 0, 0, 3, 0, time.UTC), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertJSON(read("live-activity.valid.json"), live)
+	diagnostic, err := NotificationTestPayload(model.NotificationTest{ID: "synthetic-test-1", Style: "warning"}, model.DefaultPreferences())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertJSON(read("notification-test.valid.json"), diagnostic)
 	page := model.SyncPage{OK: true, Items: []model.SyncItem{{Report: report, Event: report.Event()}},
 		Next: 1, HasMore: false, Latest: 1, ServerTime: "2026-10-05T00:00:03Z"}
 	assertJSON(read("sync.valid.json"), marshal(page))

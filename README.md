@@ -18,6 +18,8 @@ DMDATAの地震情報をGoサーバーで受信し、APNs経由で本人のiOS�
 
 [構成](docs/architecture.md) / [API](docs/api.md) / [通知仕様](docs/event-semantics.md) / [対象電文](docs/initial-release-scope.md)
 
+受信状態の表示、地域・震度・種別の通知設定、自分の端末への通知テスト、EEW予報と津波警報・注意報のLive Activityに対応します。[通知とLive Activity](docs/notification-usability.md)を参照してください。
+
 ## 開発・検証
 
 Go 1.26以上とPython 3で、POSIX環境は sh scripts/verify.sh、PowerShellは ./scripts/verify.ps1 を実行します。iOSのビルドとテストはMac/Xcode、またはこのリポジトリのGitHub Actionsで実行します。

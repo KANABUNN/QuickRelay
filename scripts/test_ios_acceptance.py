@@ -19,13 +19,13 @@ class ScreenshotReceiverTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(acceptance, 'command') as command:
             evidence = Path(directory)
             with acceptance.notification_control('unused', evidence) as (base, injections, captures):
-                for state in ('launched', 'foreground', 'background', 'terminated'):
+                for state in ('launched', 'foreground', 'background', 'terminated', 'notification-settings', 'notification-test'):
                     request = urllib.request.Request(base + '/capture/' + state, data=data,
                                                      headers={'Content-Type': 'image/png'})
                     with urllib.request.urlopen(request, timeout=5) as response:
                         self.assertEqual(response.status, 204)
                     self.assertEqual((evidence / ('simulator-' + state + '.png')).read_bytes(), data)
-                self.assertEqual(captures, ['launched', 'foreground', 'background', 'terminated'])
+                self.assertEqual(captures, ['launched', 'foreground', 'background', 'terminated', 'notification-settings', 'notification-test'])
                 self.assertEqual(injections, [])
                 command.assert_not_called()
 

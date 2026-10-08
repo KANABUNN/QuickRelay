@@ -14,8 +14,11 @@ import (
 	"quakerelay/server/internal/store"
 )
 
+type SourceSnapshotter interface{ Snapshot() dmdata.Stats }
+
 type Server struct {
-	Source                 *dmdata.Client
+	TestSender             NotificationTestSender
+	Source                 SourceSnapshotter
 	Store                  *store.Store
 	PairingSecret          string
 	APNsConfigured         bool
@@ -35,6 +38,12 @@ func New(st *store.Store, secret string) *Server {
 	s.mux.HandleFunc("GET /api/v1/devices/me", s.auth(s.device))
 	s.mux.HandleFunc("DELETE /api/v1/devices/me", s.auth(s.revoke))
 	s.mux.HandleFunc("PATCH /api/v1/devices/me/preferences", s.auth(s.preferences))
+	s.mux.HandleFunc("POST /api/v1/devices/me/notification-tests", s.auth(s.requestNotificationTest))
+	s.mux.HandleFunc("GET /api/v1/devices/me/notification-tests/{test}", s.auth(s.notificationTest))
+	s.mux.HandleFunc("PUT /api/v1/devices/me/live-activity/start-token", s.auth(s.liveStartToken))
+	s.mux.HandleFunc("DELETE /api/v1/devices/me/live-activity/start-token", s.auth(s.clearLiveStartToken))
+	s.mux.HandleFunc("PUT /api/v1/devices/me/live-activity/token", s.auth(s.liveActivityToken))
+	s.mux.HandleFunc("POST /api/v1/devices/me/live-activity/ended", s.auth(s.liveActivityEnded))
 	s.HistoryRoutes()
 	s.StatusRoutes()
 	return s
@@ -160,10 +169,14 @@ func (s *Server) revoke(w http.ResponseWriter, r *http.Request, id string) {
 }
 func (s *Server) preferences(w http.ResponseWriter, r *http.Request, id string) {
 	var p struct {
-		NotificationsEnabled *bool     `json:"notifications_enabled"`
-		TimeSensitiveEnabled *bool     `json:"time_sensitive_enabled"`
-		CustomSoundEnabled   *bool     `json:"custom_sound_enabled"`
-		EventTypes           *[]string `json:"event_types"`
+		NotificationsEnabled  *bool     `json:"notifications_enabled"`
+		TimeSensitiveEnabled  *bool     `json:"time_sensitive_enabled"`
+		CustomSoundEnabled    *bool     `json:"custom_sound_enabled"`
+		EventTypes            *[]string `json:"event_types"`
+		EarthquakeRegions     *[]string `json:"earthquake_regions"`
+		TsunamiRegions        *[]string `json:"tsunami_regions"`
+		MinimumIntensity      *string   `json:"minimum_intensity"`
+		LiveActivitiesEnabled *bool     `json:"live_activities_enabled"`
 	}
 	if err := decode(w, r, &p); err != nil {
 		fail(w, err)
@@ -185,6 +198,18 @@ func (s *Server) preferences(w http.ResponseWriter, r *http.Request, id string) 
 	}
 	if p.EventTypes != nil {
 		d.Preferences.EventTypes = *p.EventTypes
+	}
+	if p.EarthquakeRegions != nil {
+		d.Preferences.EarthquakeRegions = *p.EarthquakeRegions
+	}
+	if p.TsunamiRegions != nil {
+		d.Preferences.TsunamiRegions = *p.TsunamiRegions
+	}
+	if p.MinimumIntensity != nil {
+		d.Preferences.MinimumIntensity = *p.MinimumIntensity
+	}
+	if p.LiveActivitiesEnabled != nil {
+		d.Preferences.LiveActivitiesEnabled = *p.LiveActivitiesEnabled
 	}
 	if err := s.Store.Preferences(r.Context(), id, d.Preferences); err != nil {
 		fail(w, err)

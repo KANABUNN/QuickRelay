@@ -119,9 +119,25 @@ final class ServerAcceptanceTests: XCTestCase {
         XCTAssertTrue(tail.items.contains { $0.report.telegramType == "WEPA60" && $0.report.bulletin?.document?.format == "a/n" })
         preferences.eventTypes += ["tsunami_warning", "tsunami_info", "nankai_info", "seismic_advisory", "earthquake_data"]
 
+        let status = try await api.receiverStatus()
+        XCTAssertEqual(status.sourceConfigured, false)
+        XCTAssertEqual(status.sourceFresh, false)
+        XCTAssertEqual(status.db, true)
+        preferences.earthquakeRegions = ["宮崎県"]
+        preferences.tsunamiRegions = ["宮崎県"]
+        preferences.minimumIntensity = "4"
+        preferences.liveActivitiesEnabled = false
         preferences.notificationsEnabled = false
         let changed = try await api.updatePreferences(preferences)
         XCTAssertFalse(changed.preferences.notificationsEnabled)
+        XCTAssertEqual(changed.preferences.earthquakeRegions, ["宮崎県"])
+        XCTAssertEqual(changed.preferences.tsunamiRegions, ["宮崎県"])
+        XCTAssertEqual(changed.preferences.minimumIntensity, "4")
+        XCTAssertEqual(changed.preferences.liveActivitiesEnabled, false)
+        // Synthetic ActivityKit token registration exercises the authenticated
+        // wire shape; the offline fixture cannot send any Apple pushes.
+        try await api.registerLiveActivityStartToken("aabb")
+        try await api.clearLiveActivityStartToken()
         let current = try await api.currentDevice()
         XCTAssertFalse(current.device.preferences.notificationsEnabled)
         try await api.revokeDevice()

@@ -238,6 +238,7 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 	r.Category = p.category
 	r.EventID = bulletinEventID(p, e.Head.Type, c.EventID, e.ID)
 	r.InfoType = c.InfoType
+	r.AffectedAreas = affectedAreas(body, r.TelegramType)
 	r.PressedAt = c.PressedAt
 	r.MessageID = e.ID
 	r.Classification = expected

@@ -1,13 +1,21 @@
 import Foundation
 
-// Intentionally separate from normal APNs device-token registration. The MVP
-// has no ActivityKit dependency and does not create, update, or end activities.
-protocol LiveActivityPushTokenRegistrar: Sendable {
-    func register(pushToken: Data, eventID: String) async throws
-    func unregister(eventID: String) async throws
-}
+@MainActor
+struct LiveActivityPushTokenRegistrar {
+    let api: APIClient
 
-struct DisabledLiveActivityPushTokenRegistrar: LiveActivityPushTokenRegistrar {
-    func register(pushToken: Data, eventID: String) async throws {}
-    func unregister(eventID: String) async throws {}
+    func registerStart(pushToken: Data) async throws {
+        try await api.registerLiveActivityStartToken(hex(pushToken))
+    }
+    func register(pushToken: Data, attributes: QuickRelayActivityAttributes, activityID: String) async throws {
+        try await api.registerLiveActivityToken(
+            eventID: attributes.eventID, telegramType: attributes.telegramType,
+            activityID: activityID, pushToken: hex(pushToken), startSequence: attributes.startSequence)
+    }
+    func ended(attributes: QuickRelayActivityAttributes, activityID: String, dismissed: Bool) async throws {
+        try await api.liveActivityEnded(eventID: attributes.eventID,
+                                       telegramType: attributes.telegramType, activityID: activityID,
+                                       startSequence: attributes.startSequence, dismissed: dismissed)
+    }
+    private func hex(_ data: Data) -> String { data.map { String(format: "%02x", $0) }.joined() }
 }

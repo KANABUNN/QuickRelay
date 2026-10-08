@@ -1,0 +1,13 @@
+{
+  "aps": {
+    "alert": {
+      "title": "Quick Relay 通知テスト（警報音）",
+      "body": "これは通知経路のテストです。地震情報ではありません。"
+    },
+    "sound": "quake_warning.caf",
+    "interruption-level": "time-sensitive",
+    "thread-id": "quick-relay-tests"
+  },
+  "category": "system_test",
+  "test_id": "synthetic-test-1"
+}

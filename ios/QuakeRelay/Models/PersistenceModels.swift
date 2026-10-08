@@ -268,3 +268,10 @@ enum PersistenceSchema {
         SyncCursorEntity.self
     ]
 }
+
+enum ReportTimelineDisplay {
+    static func visible(_ reports: [ReportEntity]) -> [ReportEntity] {
+        let modernEvents = Set(reports.filter { $0.telegramType == "VXSE45" }.map(\.eventId))
+        return reports.filter { $0.telegramType != "VXSE44" || !modernEvents.contains($0.eventId) }
+    }
+}

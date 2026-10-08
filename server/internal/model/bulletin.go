@@ -34,8 +34,9 @@ func (r Report) Attention() bool {
 	return r.IsEEW() || r.EventType == "tsunami_warning" || r.EventType == "nankai_info" && r.Warning
 }
 
-// Raw non-XML products do not carry a trustworthy operational/test flag.
-// Keep every received part available in authenticated history without alerting.
+// VXSE45 replaces the still-distributed VXSE44 forecast. Keep VXSE44 in
+// authenticated history but never alert twice or compare their serial streams.
+// Raw non-XML products lack a trustworthy operational/test flag and also stay history-only.
 func (r Report) PushEligible() bool {
-	return r.TelegramType != "IXAC41" && r.TelegramType != "WEPA60"
+	return r.TelegramType != "VXSE44" && r.TelegramType != "IXAC41" && r.TelegramType != "WEPA60"
 }

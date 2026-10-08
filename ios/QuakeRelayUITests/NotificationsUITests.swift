@@ -90,6 +90,23 @@ final class NotificationsUITests: XCTestCase {
         if !text.waitForExistence(timeout: 3) { app.swipeUp() }
         XCTAssertTrue(text.waitForExistence(timeout: 5))
         try await action("capture/advisory", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.tabBars.buttons["設定"].tap()
+        let live = app.switches["liveActivityToggle"].firstMatch
+        for _ in 0..<6 {
+            if live.exists && live.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(live.exists, "Live Activity preference missing")
+        try await action("capture/notification-settings", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        let test = app.buttons["sendNotificationTest"]
+        for _ in 0..<6 {
+            if test.exists && test.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.textFields["地震の通知対象地域"].exists)
+        XCTAssertTrue(app.textFields["津波の通知対象地域"].exists)
+        XCTAssertTrue(test.exists, "Own-device notification test control missing")
+        try await action("capture/notification-test", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
     }
 
     private func action(_ path: String, at base: URL, body: Data? = nil) async throws {

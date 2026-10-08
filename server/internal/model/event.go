@@ -20,6 +20,19 @@ type Hypocenter struct {
 	Magnitude      *float64 `json:"magnitude"`
 }
 
+func (h Hypocenter) Qualification() string {
+	if h.Note != "" {
+		return h.Note
+	}
+	if h.Status == "assumed" {
+		return "仮定震源の参考値です。"
+	}
+	if h.Status == "low_accuracy" {
+		return "精度の低い推定です。"
+	}
+	return ""
+}
+
 type Report struct {
 	ID             string          `json:"id"`
 	EventID        string          `json:"event_id"`
@@ -49,6 +62,7 @@ type Report struct {
 	InfoType       string          `json:"info_type,omitempty"`
 	PressedAt      *time.Time      `json:"press_time,omitempty"`
 	Bulletin       *Bulletin       `json:"bulletin,omitempty"`
+	AffectedAreas  []AffectedArea  `json:"affected_areas,omitempty"`
 	Raw            json.RawMessage `json:"-"`
 }
 

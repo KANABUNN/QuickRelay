@@ -1,0 +1,36 @@
+{
+  "aps": {
+    "timestamp": 1791158403,
+    "event": "start",
+    "content-state": {
+      "title": "緊急地震速報（予報） 第1報",
+      "summary": "日向灘で地震。 予想最大震度5弱。 M5.7。",
+      "statusText": "続報を待機",
+      "intensityText": "最大震度 5弱",
+      "reportLabel": "第1報",
+      "category": "earthquake",
+      "warning": false,
+      "ended": false,
+      "cancelled": false,
+      "reportedAt": 1791158401,
+      "updatedAt": 1791158403
+    },
+    "stale-date": 1791158463,
+    "attributes-type": "QuickRelayActivityAttributes",
+    "attributes": {
+      "eventID": "20261005000000",
+      "telegramType": "VXSE45",
+      "startSequence": 1
+    },
+    "alert": {
+      "title": "緊急地震速報（予報） 第1報",
+      "body": "日向灘で地震。 予想最大震度5弱。 M5.7。",
+      "sound": "quake_update.caf"
+    },
+    "interruption-level": "time-sensitive"
+  },
+  "category": "earthquake",
+  "event_id": "20261005000000",
+  "report_id": "fixture-report-1",
+  "server_sequence": 1
+}

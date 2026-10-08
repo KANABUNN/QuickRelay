@@ -140,7 +140,7 @@ def notification_control(simulator, evidence):
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
                 command(['xcrun', 'simctl', 'push', simulator, 'jp.kb-dev.quickrelay', str(path)], timeout=30)
                 injections.append(state)
-            elif self.path in ['/capture/' + state for state in ('launched', 'tsunami', 'advisory', 'ordinary') + states]:
+            elif self.path in ['/capture/' + state for state in ('launched', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
                 state = self.path.rsplit('/', 1)[1]
                 try:
                     size = int(self.headers.get('Content-Length', '0'))
@@ -176,7 +176,7 @@ def notification_control(simulator, evidence):
 
 def source_evidence(mode, baseline=None):
     trees = {name: command(['git', 'rev-parse', 'HEAD:' + path])
-             for name, path in (('server', 'server'), ('ios', 'ios/QuakeRelay'))}
+             for name, path in (('server', 'server'), ('ios', 'ios'))}
     matches = None
     if baseline is not None:
         if set(baseline) != {'server', 'ios'} or not all(
@@ -186,7 +186,7 @@ def source_evidence(mode, baseline=None):
         matches = {name: trees[name] == baseline[name] for name in trees}
     if mode == 'deployed' and (matches is None or not all(matches.values())):
         raise SystemExit('Deployed mode requires an explicit baseline matching both source trees.')
-    return {'source_mode': mode, 'source_tree_ids': trees,
+    return {'source_mode': mode, 'source_tree_ids': trees, 'source_tree_paths': {'server': 'server', 'ios': 'ios'},
             'matches_recorded_deployed_sources': matches}
 
 
@@ -322,7 +322,7 @@ def main():
                 finally:
                     test_run.unlink()
                 assert injections == ['foreground', 'background', 'terminated']
-                assert captures == ['launched', 'foreground', 'background', 'terminated', 'ordinary', 'tsunami', 'advisory']
+                assert captures == ['launched', 'foreground', 'background', 'terminated', 'ordinary', 'tsunami', 'advisory', 'notification-settings', 'notification-test']
         finally:
             if relay.poll() is None:
                 relay.terminate()

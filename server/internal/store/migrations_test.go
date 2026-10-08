@@ -52,7 +52,7 @@ func TestUpgradeMigrationAndRestart(t *testing.T) {
 	defer st.Close()
 	var count int
 	var mode, integrity string
-	if err = st.DB.QueryRow("SELECT count(*) FROM schema_migrations").Scan(&count); err != nil || count != 3 {
+	if err = st.DB.QueryRow("SELECT count(*) FROM schema_migrations").Scan(&count); err != nil || count != 5 {
 		t.Fatal(count, err)
 	}
 	if err = st.DB.QueryRow("PRAGMA journal_mode").Scan(&mode); err != nil || mode != "wal" {

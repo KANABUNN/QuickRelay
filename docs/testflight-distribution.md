@@ -11,6 +11,10 @@ It does not submit an App Store version or create a public invitation link.
    Its certificate must match the P12; production Push Notifications and Time
    Sensitive Notifications must be enabled. The signing script checks these,
    profile expiry, App ID, team, and that this is not a development/Ad Hoc profile.
+   Also issue a dedicated App Store profile for jp.kb-dev.quickrelay.LiveActivity,
+   using the same Apple Distribution certificate. This WidgetKit extension does
+   not need the application's Push/Time Sensitive entitlements. The archive embeds
+   the extension, and signing/export use separate exact App IDs and profiles.
 2. Configure a `testflight` GitHub environment. Permit only the reviewed release
    tag(s). Keep signing inputs in this environment rather than repository-wide
    secrets. Require the owner to approve this environment; allow self-review for a single-owner project.
@@ -21,7 +25,8 @@ It does not submit an App Store version or create a public invitation link.
    | `APPLE_TEAM_ID` | Apple team identifier |
    | `IOS_DISTRIBUTION_P12_BASE64` | Base64 of password-protected P12 |
    | `IOS_DISTRIBUTION_P12_PASSWORD` | P12 password |
-   | `IOS_PROVISION_PROFILE_BASE64` | Base64 of distribution mobileprovision |
+   | `IOS_PROVISION_PROFILE_BASE64` | Base64 of application distribution mobileprovision |
+   | `IOS_LIVE_ACTIVITY_PROFILE_BASE64` | Base64 of the dedicated WidgetKit extension distribution mobileprovision |
    | `ASC_PRIVATE_KEY_BASE64` | Base64 of App Store Connect API private key |
    | `ASC_KEY_ID` | API key identifier |
    | `ASC_ISSUER_ID` | API issuer identifier |

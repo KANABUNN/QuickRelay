@@ -31,6 +31,8 @@ type Store struct{ DB *sql.DB }
 var ErrUnauthorized = errors.New("unauthorized")
 var ErrInvalid = errors.New("invalid request")
 var ErrNotFound = errors.New("not found")
+var ErrRateLimited = errors.New("rate limited")
+var ErrPushUnavailable = errors.New("push unavailable")
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 func ValidID(s string) bool   { return identifier.MatchString(s) }
@@ -179,6 +181,21 @@ func (s *Store) Authenticate(ctx context.Context, token string) (string, error) 
 	return id, err
 }
 func ValidatePreferences(p model.Preferences) error {
+	if p.MinimumIntensity != "" && (model.IntensityRank(p.MinimumIntensity) < 1 || !strings.Contains("|1|2|3|4|5-|5+|6-|6+|7|", "|"+p.MinimumIntensity+"|")) {
+		return ErrInvalid
+	}
+	for _, names := range [][]string{p.EarthquakeRegions, p.TsunamiRegions} {
+		if len(names) > 20 {
+			return ErrInvalid
+		}
+		seen := map[string]bool{}
+		for _, name := range names {
+			if name == "" || len([]rune(name)) > 60 || strings.TrimSpace(name) != name || strings.ContainsAny(name, "\r\n\t") || seen[name] {
+				return ErrInvalid
+			}
+			seen[name] = true
+		}
+	}
 	if len(p.EventTypes) > 20 {
 		return ErrInvalid
 	}
@@ -230,7 +247,13 @@ func (s *Store) Register(ctx context.Context, id string, r model.Registration, n
 			return err
 		}
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	if r.Preferences != nil && (!r.Preferences.NotificationsEnabled || !r.Preferences.LiveActivitiesEnabled) {
+		return s.StopLiveActivities(ctx, id, now)
+	}
+	return nil
 }
 func (s *Store) Device(ctx context.Context, id string) (model.Device, error) {
 	var d model.Device
@@ -253,10 +276,19 @@ func (s *Store) Preferences(ctx context.Context, id string, p model.Preferences)
 	}
 	b, _ := json.Marshal(p)
 	_, err := s.DB.ExecContext(ctx, "UPDATE devices SET preferences=? WHERE installation_id=?", string(b), id)
+	if err == nil && (!p.NotificationsEnabled || !p.LiveActivitiesEnabled) {
+		err = s.StopLiveActivities(ctx, id, time.Now())
+	}
 	return err
 }
 func (s *Store) Revoke(ctx context.Context, id string) error {
+	if err := s.StopLiveActivities(ctx, id, time.Now()); err != nil {
+		return err
+	}
 	_, err := s.DB.ExecContext(ctx, "UPDATE devices SET revoked=1,push_active=0,token='' WHERE installation_id=?", id)
+	if err == nil {
+		_, err = s.DB.ExecContext(ctx, "DELETE FROM live_activity_start_tokens WHERE device_id=?", id)
+	}
 	return err
 }
 func (s *Store) InvalidateToken(ctx context.Context, d model.Device, invalidatedMS int64) error {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"quakerelay/server/internal/dmdata"
+	"quakerelay/server/internal/store"
 )
 
 func (s *Server) StatusRoutes() {
@@ -24,7 +25,7 @@ func (s *Server) source() dmdata.Stats {
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	source := s.source()
 	db := s.Store.DB.PingContext(r.Context()) == nil
-	ready := db && s.APNsConfigured && source.Connected && time.Since(source.LastFrameAt) < 100*time.Second
+	ready := db && s.APNsConfigured && sourceIsFresh(source, time.Now())
 	status := 200
 	if !ready {
 		status = 503
@@ -37,7 +38,11 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request, _ string) {
 		fail(w, err)
 		return
 	}
-	reply(w, 200, map[string]any{"ok": true, "source": s.source(), "deliveries": counts, "apns_configured": s.APNsConfigured})
+	state := s.source()
+	now := time.Now()
+	fresh := sourceIsFresh(state, now)
+	reply(w, 200, map[string]any{"ok": true, "source": state, "source_configured": s.Source != nil, "source_fresh": fresh,
+		"deliveries": counts, "apns_configured": s.APNsConfigured, "db": s.Store.DB.PingContext(r.Context()) == nil, "server_time": store.Time(now)})
 }
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request, _ string) {
 	counts, err := s.Store.DeliveryCounts(r.Context())
@@ -55,4 +60,9 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request, _ string) {
 	for _, status := range []string{"pending", "retry", "sending", "accepted", "failed", "expired", "invalid_token", "skipped"} {
 		_, _ = fmt.Fprintf(w, "quakerelay_deliveries{status=%q} %d\n", status, counts[status])
 	}
+}
+
+func sourceIsFresh(state dmdata.Stats, now time.Time) bool {
+	elapsed := now.Sub(state.LastFrameAt)
+	return state.Connected && !state.LastFrameAt.IsZero() && elapsed >= 0 && elapsed < 100*time.Second
 }

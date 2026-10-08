@@ -402,9 +402,52 @@
                         "eew_cancel",
                         "earthquake_info",
                         "earthquake_update",
-                        "system_test"
+                        "system_test",
+                        "tsunami_warning",
+                        "tsunami_info",
+                        "nankai_info",
+                        "seismic_advisory",
+                        "earthquake_data"
                       ]
                     }
+                  },
+                  "earthquake_regions": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    }
+                  },
+                  "tsunami_regions": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    }
+                  },
+                  "minimum_intensity": {
+                    "enum": [
+                      "",
+                      "1",
+                      "2",
+                      "3",
+                      "4",
+                      "5-",
+                      "5+",
+                      "6-",
+                      "6+",
+                      "7"
+                    ]
+                  },
+                  "live_activities_enabled": {
+                    "type": "boolean",
+                    "default": false
                   }
                 }
               }
@@ -603,7 +646,78 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "source",
+                    "source_configured",
+                    "source_fresh",
+                    "db",
+                    "server_time",
+                    "apns_configured",
+                    "deliveries"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "source": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "connected",
+                        "last_frame_at",
+                        "last_data_at",
+                        "reconnects",
+                        "rejected"
+                      ],
+                      "properties": {
+                        "connected": {
+                          "type": "boolean"
+                        },
+                        "last_frame_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "last_data_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "reconnects": {
+                          "type": "integer"
+                        },
+                        "rejected": {
+                          "type": "integer"
+                        },
+                        "last_error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "source_configured": {
+                      "type": "boolean"
+                    },
+                    "source_fresh": {
+                      "type": "boolean"
+                    },
+                    "db": {
+                      "type": "boolean"
+                    },
+                    "server_time": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "apns_configured": {
+                      "type": "boolean"
+                    },
+                    "deliveries": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -879,6 +993,364 @@
           }
         }
       }
+    },
+    "/api/v1/devices/me/notification-tests": {
+      "post": {
+        "summary": "Send a labelled diagnostic to the requesting installation only",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request_id",
+                  "style"
+                ],
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  },
+                  "style": {
+                    "enum": [
+                      "normal",
+                      "warning"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "test",
+                    "cooldown_seconds"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "test": {
+                      "$ref": "#/components/schemas/NotificationTest"
+                    },
+                    "cooldown_seconds": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Installation authentication required"
+          },
+          "409": {
+            "description": "Notifications or installation disabled"
+          },
+          "429": {
+            "description": "One new request per 60 seconds"
+          },
+          "503": {
+            "description": "APNs unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/devices/me/notification-tests/{test}": {
+      "get": {
+        "summary": "Read this installation's diagnostic",
+        "parameters": [
+          {
+            "name": "test",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "test",
+                    "cooldown_seconds"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "test": {
+                      "$ref": "#/components/schemas/NotificationTest"
+                    },
+                    "cooldown_seconds": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Unknown or not owned"
+          }
+        }
+      }
+    },
+    "/api/v1/devices/me/live-activity/start-token": {
+      "put": {
+        "summary": "Register or rotate an ActivityKit push-to-start token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "push_token"
+                ],
+                "properties": {
+                  "push_token": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 512,
+                    "pattern": "^[A-Fa-f0-9]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Installation authentication required"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove this installation's push-to-start token when iOS disables Live Activities",
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/api/v1/devices/me/live-activity/token": {
+      "put": {
+        "summary": "Register or rotate an activity token and recover latest content",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event_id",
+                  "telegram_type",
+                  "activity_id",
+                  "push_token",
+                  "start_sequence"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  },
+                  "telegram_type": {
+                    "enum": [
+                      "VXSE45",
+                      "VTSE41"
+                    ]
+                  },
+                  "activity_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  },
+                  "push_token": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 512,
+                    "pattern": "^[A-Fa-f0-9]+$"
+                  },
+                  "start_sequence": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Installation authentication required"
+          }
+        }
+      }
+    },
+    "/api/v1/devices/me/live-activity/ended": {
+      "post": {
+        "summary": "Stop tracking a dismissed or ended activity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event_id",
+                  "telegram_type",
+                  "activity_id",
+                  "start_sequence"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  },
+                  "telegram_type": {
+                    "enum": [
+                      "VXSE45",
+                      "VTSE41"
+                    ]
+                  },
+                  "activity_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  },
+                  "dismissed": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "True only when the user dismisses an active activity; natural completion may allow a later tsunami warning."
+                  },
+                  "start_sequence": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Start generation carried in the activity attributes; rejects late end callbacks from earlier activities."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Installation authentication required"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -903,6 +1375,39 @@
       },
       "SyncPage": {
         "$ref": "./api.schema.json#/$defs/SyncPage"
+      },
+      "NotificationTest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "style",
+          "status",
+          "requested_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "style": {
+            "enum": [
+              "normal",
+              "warning"
+            ]
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "apns_accepted",
+              "rejected",
+              "result_unknown"
+            ]
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     }
   }

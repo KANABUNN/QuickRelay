@@ -7,6 +7,8 @@
 | `openapi.json` | OpenAPI 3.1形式の現行HTTP API（URLはorigin基準） |
 | `api.schema.json` | `$defs/Report`, `Event`, `SyncPage`, `Device`, `Preferences` |
 | `push-payload.schema.json` | APNsの通常報通知。単体接続テストCLIの通知は対象外 |
+| `live-activity-payload.schema.json` | ActivityKitの開始・無音更新・終了。既定のCodableキーを共有 |
+| `notification-test-payload.schema.json` | 操作した端末だけへの明示的な通知テスト |
 | `examples/*.valid.json` | 秘密情報を含まない合成データ（実際の災害電文ではない） |
 | `fixtures/text-normalization/` | 旧版から抽出した地名辞書・文字正規化の参考fixture |
 

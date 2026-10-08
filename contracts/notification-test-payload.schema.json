@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quick Relay own-device notification diagnostic",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aps",
+    "category",
+    "test_id"
+  ],
+  "properties": {
+    "category": {
+      "const": "system_test"
+    },
+    "test_id": {
+      "type": "string"
+    },
+    "aps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alert",
+        "sound",
+        "interruption-level",
+        "thread-id"
+      ],
+      "properties": {
+        "alert": {
+          "type": "object",
+          "required": [
+            "title",
+            "body"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "const": "これは通知経路のテストです。地震情報ではありません。"
+            }
+          }
+        },
+        "sound": {
+          "enum": [
+            "default",
+            "normal.caf",
+            "quake_warning.caf"
+          ]
+        },
+        "interruption-level": {
+          "enum": [
+            "active",
+            "time-sensitive"
+          ]
+        },
+        "thread-id": {
+          "const": "quick-relay-tests"
+        }
+      }
+    }
+  }
+}

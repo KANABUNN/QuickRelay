@@ -38,6 +38,15 @@ class ProfileTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             distribution.validate_profile(self.profile, 'OTHERTEAM0', 'jp.example.test')
 
+    def test_extension_profile_requires_its_own_exact_app_id(self):
+        profile = copy.deepcopy(self.profile)
+        profile['Entitlements']['application-identifier'] += '.LiveActivity'
+        del profile['Entitlements']['aps-environment']
+        del profile['Entitlements']['com.apple.developer.usernotifications.time-sensitive']
+        distribution.validate_profile(profile, 'TESTTEAM00', 'jp.example.test.LiveActivity', extension=True)
+        with self.assertRaises(ValueError):
+            distribution.validate_profile(self.profile, 'TESTTEAM00', 'jp.example.test.LiveActivity', extension=True)
+
     def test_expired_or_device_limited_profile(self):
         for key, value in [('ExpirationDate', datetime.datetime(2020, 1, 1)),
                            ('ProvisionedDevices', ['device']), ('ProvisionsAllDevices', True)]:

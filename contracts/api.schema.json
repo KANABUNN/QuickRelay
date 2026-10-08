@@ -150,6 +150,12 @@
         },
         "bulletin": {
           "$ref": "#/$defs/Bulletin"
+        },
+        "affected_areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AffectedArea"
+          }
         }
       }
     },
@@ -316,6 +322,44 @@
               "earthquake_data"
             ]
           }
+        },
+        "earthquake_regions": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          }
+        },
+        "tsunami_regions": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          }
+        },
+        "minimum_intensity": {
+          "enum": [
+            "",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5-",
+            "5+",
+            "6-",
+            "6+",
+            "7"
+          ]
+        },
+        "live_activities_enabled": {
+          "type": "boolean",
+          "default": false
         }
       }
     },
@@ -564,6 +608,21 @@
         },
         "complete": {
           "type": "boolean"
+        }
+      }
+    },
+    "AffectedArea": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_intensity": {
+          "type": "string"
         }
       }
     }
