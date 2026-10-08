@@ -93,7 +93,7 @@ func LivePayload(r model.Report, p model.Preferences, event string, now time.Tim
 		aps["alert"] = alert
 		aps["interruption-level"] = normal["interruption-level"]
 		aps["attributes-type"] = "QuickRelayActivityAttributes"
-		aps["attributes"] = map[string]string{"eventID": r.EventID, "telegramType": r.TelegramType}
+		aps["attributes"] = map[string]any{"eventID": r.EventID, "telegramType": r.TelegramType, "startSequence": r.ServerSequence}
 	}
 	b, err := json.Marshal(payload)
 	if err == nil && len(b) > 4096 {
@@ -119,7 +119,8 @@ func (w *Worker) liveStart(ctx context.Context, d store.Delivery, device model.D
 	}
 	body, err := LivePayload(d.Report, device.Preferences, "start", now, false)
 	if err != nil {
-		return false, err
+		// An optional widget payload must not prevent the ordinary alert.
+		return false, w.Store.FinishLiveStart(ctx, d.DeviceID, d.Report, token, false, false, now)
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	result, sendErr := w.Sender.Send(sendCtx, apns.Request{Token: token, Environment: device.Environment, Payload: body,

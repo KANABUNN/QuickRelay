@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quick Relay ActivityKit payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aps",
+    "category",
+    "event_id",
+    "report_id",
+    "server_sequence"
+  ],
+  "properties": {
+    "aps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timestamp",
+        "event",
+        "content-state"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "integer"
+        },
+        "event": {
+          "enum": [
+            "start",
+            "update",
+            "end"
+          ]
+        },
+        "content-state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "summary",
+            "statusText",
+            "intensityText",
+            "reportLabel",
+            "category",
+            "warning",
+            "ended",
+            "cancelled",
+            "reportedAt",
+            "updatedAt"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "statusText": {
+              "type": "string"
+            },
+            "intensityText": {
+              "type": "string"
+            },
+            "reportLabel": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "warning": {
+              "type": "boolean"
+            },
+            "ended": {
+              "type": "boolean"
+            },
+            "cancelled": {
+              "type": "boolean"
+            },
+            "reportedAt": {
+              "type": "integer"
+            },
+            "updatedAt": {
+              "type": "integer"
+            }
+          }
+        },
+        "stale-date": {
+          "type": "integer"
+        },
+        "dismissal-date": {
+          "type": "integer"
+        },
+        "attributes-type": {
+          "const": "QuickRelayActivityAttributes"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eventID",
+            "telegramType",
+            "startSequence"
+          ],
+          "properties": {
+            "eventID": {
+              "type": "string"
+            },
+            "telegramType": {
+              "enum": [
+                "VXSE45",
+                "VTSE41"
+              ]
+            },
+            "startSequence": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "alert": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "body",
+            "sound"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "sound": {
+              "type": "string"
+            }
+          }
+        },
+        "interruption-level": {
+          "enum": [
+            "active",
+            "time-sensitive"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "event": {
+                "const": "start"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "alert",
+              "attributes-type",
+              "attributes",
+              "stale-date"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "alert"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event": {
+                "const": "end"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "dismissal-date"
+            ],
+            "properties": {
+              "content-state": {
+                "properties": {
+                  "ended": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "required": [
+              "stale-date"
+            ]
+          }
+        }
+      ]
+    },
+    "category": {
+      "enum": [
+        "earthquake",
+        "tsunami"
+      ]
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "report_id": {
+      "type": "string"
+    },
+    "server_sequence": {
+      "type": "integer"
+    }
+  }
+}

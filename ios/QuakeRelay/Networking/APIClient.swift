@@ -287,14 +287,25 @@ final class APIClient {
 }
 
 extension APIClient {
+    func clearLiveActivityStartToken() async throws {
+        let _: SuccessResponse = try await request(path: "devices/me/live-activity/start-token",
+                                                   method: "DELETE", authentication: .device)
+    }
     func registerLiveActivityStartToken(_ token: String) async throws {
         let body = try encoder.encode(["push_token": token])
         let _: SuccessResponse = try await request(path: "devices/me/live-activity/start-token",
                                                    method: "PUT", body: body, authentication: .device)
     }
-    func registerLiveActivityToken(eventID: String, telegramType: String, activityID: String, pushToken: String) async throws {
-        let body = try encoder.encode(["event_id": eventID, "telegram_type": telegramType,
-                                       "activity_id": activityID, "push_token": pushToken])
+    func registerLiveActivityToken(eventID: String, telegramType: String, activityID: String, pushToken: String, startSequence: Int64) async throws {
+        struct Registration: Encodable {
+            let eventId: String
+            let telegramType: String
+            let activityId: String
+            let pushToken: String
+            let startSequence: Int64
+        }
+        let body = try encoder.encode(Registration(eventId: eventID, telegramType: telegramType,
+                                                   activityId: activityID, pushToken: pushToken, startSequence: startSequence))
         let _: SuccessResponse = try await request(path: "devices/me/live-activity/token",
                                                    method: "PUT", body: body, authentication: .device)
     }

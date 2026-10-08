@@ -41,6 +41,7 @@ func New(st *store.Store, secret string) *Server {
 	s.mux.HandleFunc("POST /api/v1/devices/me/notification-tests", s.auth(s.requestNotificationTest))
 	s.mux.HandleFunc("GET /api/v1/devices/me/notification-tests/{test}", s.auth(s.notificationTest))
 	s.mux.HandleFunc("PUT /api/v1/devices/me/live-activity/start-token", s.auth(s.liveStartToken))
+	s.mux.HandleFunc("DELETE /api/v1/devices/me/live-activity/start-token", s.auth(s.clearLiveStartToken))
 	s.mux.HandleFunc("PUT /api/v1/devices/me/live-activity/token", s.auth(s.liveActivityToken))
 	s.mux.HandleFunc("POST /api/v1/devices/me/live-activity/ended", s.auth(s.liveActivityEnded))
 	s.HistoryRoutes()

@@ -34,6 +34,9 @@ final class LiveActivityCoordinator: ObservableObject {
             statusText = "ペアリング後に利用できます"
             return
         }
+        if !enabled || !ActivityAuthorizationInfo().areActivitiesEnabled || !supportsRemoteStart {
+            uploads.removeValue(forKey: "start")?.cancel()
+        }
         if !enabled {
             await endAllLocally()
             statusText = "オフ"
@@ -43,6 +46,11 @@ final class LiveActivityCoordinator: ObservableObject {
             statusText = "自動開始にはiOS 17.2以降が必要です"
         } else {
             statusText = "開始を待機"
+        }
+        if enabled && (!ActivityAuthorizationInfo().areActivitiesEnabled || !supportsRemoteStart) {
+            await endAllLocally()
+            do { try await registrar.api.clearLiveActivityStartToken() }
+            catch { registrationError = "Live Activityの停止設定をサーバーに確認できませんでした。" }
         }
         startObservers()
         // Also retry current tokens on launch/foreground/save. Rotation observers
@@ -102,6 +110,7 @@ final class LiveActivityCoordinator: ObservableObject {
                         }
                         self.tokenObservers.removeValue(forKey: activity.id)?.cancel()
                         self.uploads.removeValue(forKey: activity.id)?.cancel()
+                        self.stateObservers.removeValue(forKey: activity.id)
                         return
                     }
                 }
@@ -129,6 +138,7 @@ final class LiveActivityCoordinator: ObservableObject {
                     guard !Task.isCancelled else { return }
                     self.registrationError = nil
                     if key == "start", self.enabled { self.statusText = "自動開始の登録済み" }
+                    self.uploads.removeValue(forKey: key)
                     return
                 } catch {
                     if Task.isCancelled { return }

@@ -28,6 +28,7 @@ struct QuickRelayActivityAttributes: ActivityAttributes {
     }
     var eventID: String
     var telegramType: String
+    var startSequence: Int64 = 0
 
     var detailURL: URL? {
         guard !eventID.isEmpty,

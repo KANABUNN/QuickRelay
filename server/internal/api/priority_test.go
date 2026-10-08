@@ -119,13 +119,18 @@ func TestPreferencePatchPreservesUnmentionedFiltersAndScopesActivityTokens(t *te
 		t.Fatal(w.Code)
 	}
 	report := model.Report{ID: "r", MessageID: "m", EventID: "event1", Classification: "eew.forecast", TelegramType: "VXSE45", EventType: "eew_forecast", Raw: json.RawMessage(`{}`), ReportedAt: now, ReceivedAt: now}
-	if _, err = st.IngestHistorical(ctx, report); err != nil {
+	out, err := st.IngestHistorical(ctx, report)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if w := call("PUT", "devices/me/live-activity/token", `{"event_id":"event1","telegram_type":"VXSE43","activity_id":"a1","push_token":"eeff"}`, credential); w.Code != 404 {
+	report.ServerSequence = out.Sequence
+	if _, err = st.ReserveLiveStart(ctx, "phone", report, now); err != nil {
+		t.Fatal(err)
+	}
+	if w := call("PUT", "devices/me/live-activity/token", `{"event_id":"event1","telegram_type":"VXSE43","activity_id":"a1","push_token":"eeff","start_sequence":1}`, credential); w.Code != 404 {
 		t.Fatal("cross-stream token accepted", w.Code)
 	}
-	if w := call("PUT", "devices/me/live-activity/token", `{"event_id":"event1","telegram_type":"VXSE45","activity_id":"a1","push_token":"eeff"}`, credential); w.Code != 200 {
+	if w := call("PUT", "devices/me/live-activity/token", `{"event_id":"event1","telegram_type":"VXSE45","activity_id":"a1","push_token":"eeff","start_sequence":1}`, credential); w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	st.Close()

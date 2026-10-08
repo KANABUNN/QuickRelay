@@ -10,7 +10,7 @@ struct LiveActivityPushTokenRegistrar {
     func register(pushToken: Data, attributes: QuickRelayActivityAttributes, activityID: String) async throws {
         try await api.registerLiveActivityToken(
             eventID: attributes.eventID, telegramType: attributes.telegramType,
-            activityID: activityID, pushToken: hex(pushToken))
+            activityID: activityID, pushToken: hex(pushToken), startSequence: attributes.startSequence)
     }
     func ended(attributes: QuickRelayActivityAttributes, activityID: String) async throws {
         try await api.liveActivityEnded(eventID: attributes.eventID,

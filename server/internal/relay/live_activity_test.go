@@ -54,7 +54,7 @@ func TestLiveStartReplacesPrimaryAlertAndUpdatesSilently(t *testing.T) {
 	if first["event"] != "start" || first["alert"] == nil || first["attributes-type"] != "QuickRelayActivityAttributes" {
 		t.Fatal(first)
 	}
-	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ReportedAt); err != nil {
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ServerSequence, r.ReportedAt); err != nil {
 		t.Fatal(err)
 	}
 	n := 2
@@ -157,7 +157,7 @@ func TestLiveOptOutBeforeTokenArrivesStillEndsSilently(t *testing.T) {
 	if err := st.Preferences(ctx, "phone", p); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ReportedAt.Add(time.Second)); err != nil {
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ServerSequence, r.ReportedAt.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	w.Now = func() time.Time { return r.ReportedAt.Add(2 * time.Second) }
@@ -197,7 +197,7 @@ func TestLiveTokenGapCoalescesReportsAndCancelIsScoped(t *testing.T) {
 	warning.Classification = "eew.warning"
 	warning.Warning = true
 	warning = ingestLive(t, st, warning)
-	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", newer.ReportedAt); err != nil {
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ServerSequence, newer.ReportedAt); err != nil {
 		t.Fatal(err)
 	}
 	w.Now = func() time.Time { return r.ReportedAt.Add(3 * time.Second) }
@@ -213,7 +213,7 @@ func TestLiveTokenGapCoalescesReportsAndCancelIsScoped(t *testing.T) {
 	if err := st.EndLiveActivity(ctx, "phone", r.EventID, r.TelegramType, "activity1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", newer.ReportedAt); err != store.ErrInvalid {
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ServerSequence, newer.ReportedAt); err != store.ErrInvalid {
 		t.Fatal("late token resurrected", err)
 	}
 }
@@ -225,7 +225,7 @@ func TestLiveUpdateTokenRotationDoesNotEraseNewToken(t *testing.T) {
 	if _, err := st.ReserveLiveStart(ctx, "phone", r, r.ReportedAt); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "aacc", r.ReportedAt); err != nil {
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "aacc", r.ServerSequence, r.ReportedAt); err != nil {
 		t.Fatal(err)
 	}
 	j, err := st.ClaimLiveJob(ctx, r.ReportedAt)
@@ -233,7 +233,7 @@ func TestLiveUpdateTokenRotationDoesNotEraseNewToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	j.Token, j.ActivityID = "aacc", "activity1"
-	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ReportedAt.Add(time.Second)); err != nil {
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "activity1", "eeff", r.ServerSequence, r.ReportedAt.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.FinishLiveJob(ctx, *j, "invalid_token", "Unregistered", r.ReportedAt, true, 0); err != nil {
@@ -264,5 +264,138 @@ func TestLiveDefaultsAndPayloadQualification(t *testing.T) {
 	state := aps["content-state"].(map[string]any)
 	if state["statusText"] != "取消（解除ではありません）" || state["summary"] == "テスト" {
 		t.Fatal("qualification or cancellation lost", state)
+	}
+}
+
+func TestCancellationDoesNotFollowItselfAndRetainsPreviouslySentStream(t *testing.T) {
+	t.Run("never followed", func(t *testing.T) {
+		st, w, f, r := setup(t)
+		ctx := context.Background()
+		p := model.DefaultPreferences()
+		p.EventTypes = []string{"system_test"}
+		if err := st.Preferences(ctx, "phone", p); err != nil {
+			t.Fatal(err)
+		}
+		r.Cancelled = true
+		r.Final = true
+		r.EventType = "eew_cancel"
+		r = ingestLive(t, st, r)
+		if _, err := w.Step(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.requests) != 0 {
+			t.Fatal("unfollowed cancellation bypassed settings")
+		}
+	})
+	t.Run("followed before filter change", func(t *testing.T) {
+		st, w, f, r := setup(t)
+		ctx := context.Background()
+		r = ingestLive(t, st, r)
+		if _, err := w.Step(ctx); err != nil {
+			t.Fatal(err)
+		}
+		p := model.DefaultPreferences()
+		p.EventTypes = []string{"system_test"}
+		if err := st.Preferences(ctx, "phone", p); err != nil {
+			t.Fatal(err)
+		}
+		r.ID = "cancel"
+		r.MessageID = "cancel"
+		r.Cancelled = true
+		r.Final = true
+		r.EventType = "eew_cancel"
+		r.ReportedAt = r.ReportedAt.Add(time.Second)
+		r.ReceivedAt = r.ReportedAt
+		r = ingestLive(t, st, r)
+		w.Now = func() time.Time { return r.ReportedAt }
+		if _, err := w.Step(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.requests) != 2 {
+			t.Fatal("followed cancellation was lost")
+		}
+	})
+}
+func TestRecordedLiveStartRecoversPrimaryLeaseWithoutSecondAlert(t *testing.T) {
+	st, w, f, r := setup(t)
+	ctx := context.Background()
+	enableLive(t, st, r)
+	r = ingestLive(t, st, r)
+	d, err := st.Claim(ctx, r.ReportedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := st.ReserveLiveStart(ctx, "phone", r, r.ReportedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = st.FinishLiveStart(ctx, "phone", r, token, true, false, r.ReportedAt); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a process exit after recording start acceptance, before completing
+	// the ordinary delivery. The lease is retried but no second alert is sent.
+	w.Now = func() time.Time { return r.ReportedAt.Add(31 * time.Second) }
+	if _, err = w.Step(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.requests) != 0 {
+		t.Fatal("accepted start was sent again")
+	}
+	var status string
+	if err = st.DB.QueryRowContext(ctx, "SELECT status FROM deliveries WHERE id=?", d.ID).Scan(&status); err != nil || status != "accepted" {
+		t.Fatal(status, err)
+	}
+}
+
+func TestTsunamiNewWarningDoesNotAcceptOldActivityGeneration(t *testing.T) {
+	st, w, _, r := setup(t)
+	ctx := context.Background()
+	enableLive(t, st, r)
+	r.EventID = "tsunami-fixture"
+	r.TelegramType = "VTSE41"
+	r.Classification = "telegram.earthquake"
+	r.Category = "tsunami"
+	r.EventType = "tsunami_warning"
+	r.Warning = true
+	r.Serial = nil
+	r = ingestLive(t, st, r)
+	if _, err := w.Step(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "oldActivity", "eeff", r.ServerSequence, r.ReportedAt); err != nil {
+		t.Fatal(err)
+	}
+	clear := r
+	clear.ID = "clear"
+	clear.MessageID = "clear"
+	clear.Warning = false
+	clear.EventType = "tsunami_info"
+	clear.ReportedAt = r.ReportedAt.Add(time.Second)
+	clear.ReceivedAt = clear.ReportedAt
+	clear = ingestLive(t, st, clear)
+	now := clear.ReportedAt.Add(time.Second)
+	w.Now = func() time.Time { return now }
+	for i := 0; i < 2; i++ {
+		if _, err := w.LiveStep(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	renewed := r
+	renewed.ID = "renewed"
+	renewed.MessageID = "renewed"
+	renewed.ReportedAt = now
+	renewed.ReceivedAt = now
+	renewed = ingestLive(t, st, renewed)
+	now = now.Add(time.Second)
+	for i := 0; i < 2; i++ {
+		if _, err := w.Step(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "oldActivity", "eeff", r.ServerSequence, now); err != store.ErrInvalid {
+		t.Fatal("old generation accepted", err)
+	}
+	if err := st.RegisterLiveActivityToken(ctx, "phone", r.EventID, r.TelegramType, "newActivity", "aacc", renewed.ServerSequence, now); err != nil {
+		t.Fatal("new generation rejected", err)
 	}
 }

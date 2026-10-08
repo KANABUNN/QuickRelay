@@ -1173,6 +1173,32 @@
             "description": "Installation authentication required"
           }
         }
+      },
+      "delete": {
+        "summary": "Remove this installation's push-to-start token when iOS disables Live Activities",
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
       }
     },
     "/api/v1/devices/me/live-activity/token": {
@@ -1189,7 +1215,8 @@
                   "event_id",
                   "telegram_type",
                   "activity_id",
-                  "push_token"
+                  "push_token",
+                  "start_sequence"
                 ],
                 "properties": {
                   "event_id": {
@@ -1211,6 +1238,10 @@
                     "minLength": 2,
                     "maxLength": 512,
                     "pattern": "^[A-Fa-f0-9]+$"
+                  },
+                  "start_sequence": {
+                    "type": "integer",
+                    "minimum": 1
                   }
                 }
               }

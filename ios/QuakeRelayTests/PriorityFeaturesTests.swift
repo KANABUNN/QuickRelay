@@ -46,6 +46,21 @@ final class PriorityFeaturesTests: XCTestCase {
         XCTAssertNil(p.minimumIntensity)
         XCTAssertNil(p.earthquakeRegions)
     }
+    func testActualServerActivityFixtureDecodesAsActivityKitContent() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("contracts/examples/live-activity.valid.json"))
+        let payload = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let aps = payload["aps"] as! [String: Any]
+        let state = try JSONDecoder().decode(QuickRelayActivityAttributes.ContentState.self,
+                    from: JSONSerialization.data(withJSONObject: aps["content-state"]!))
+        let attributes = try JSONDecoder().decode(QuickRelayActivityAttributes.self,
+                    from: JSONSerialization.data(withJSONObject: aps["attributes"]!))
+        XCTAssertEqual(state.reportLabel, "第1報")
+        XCTAssertEqual(state.intensityText, "最大震度 5弱")
+        XCTAssertEqual(attributes.startSequence, 1)
+        XCTAssertEqual(attributes.eventID, "20261005000000")
+    }
     func testActivityContentUsesDefaultCodableKeysAndStaleIsNotAnAllClear() throws {
         let data = #"{"title":"緊急地震速報","summary":"仮定値","statusText":"続報を待機","intensityText":"最大震度 5弱","reportLabel":"第2報","category":"earthquake","warning":true,"ended":false,"cancelled":false,"reportedAt":1791414000,"updatedAt":1791414001}"#.data(using: .utf8)!
         let state = try JSONDecoder().decode(QuickRelayActivityAttributes.ContentState.self, from: data)

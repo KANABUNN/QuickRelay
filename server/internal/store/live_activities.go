@@ -67,6 +67,13 @@ func (s *Store) ReserveLiveStart(ctx context.Context, device string, r model.Rep
 		return "", err
 	}
 	defer tx.Rollback()
+	var currentID string
+	if err = tx.QueryRowContext(ctx, "SELECT json_extract(payload,'$.id') FROM streams WHERE event_id=? AND telegram_type=?", r.EventID, r.TelegramType).Scan(&currentID); err != nil {
+		return "", err
+	}
+	if currentID != r.ID {
+		return "", nil
+	}
 	var token string
 	err = tx.QueryRowContext(ctx, "SELECT token FROM live_activity_start_tokens WHERE device_id=?", device).Scan(&token)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -75,14 +82,14 @@ func (s *Store) ReserveLiveStart(ctx context.Context, device string, r model.Rep
 	if err != nil {
 		return "", err
 	}
-	var seq int64
+	var seq, lastSequence int64
 	var state string
-	err = tx.QueryRowContext(ctx, "SELECT start_sequence,state FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", device, r.EventID, r.TelegramType).Scan(&seq, &state)
+	err = tx.QueryRowContext(ctx, "SELECT start_sequence,last_sequence,state FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", device, r.EventID, r.TelegramType).Scan(&seq, &lastSequence, &state)
 	if err == nil {
 		if seq == r.ServerSequence && state == "starting" {
 			return token, tx.Commit()
 		}
-		if state == "ended" && r.TelegramType == "VTSE41" && r.ServerSequence > seq {
+		if state == "ended" && r.TelegramType == "VTSE41" && r.ServerSequence > lastSequence {
 			_, err = tx.ExecContext(ctx, `UPDATE live_activities SET activity_id='',token='',state='starting',
                 start_sequence=?,last_sequence=0,last_timestamp=0,updated_ms=? WHERE device_id=? AND event_id=? AND telegram_type=?`,
 				r.ServerSequence, now.UnixMilli(), device, r.EventID, r.TelegramType)
@@ -125,7 +132,7 @@ func (s *Store) FinishLiveStart(ctx context.Context, device string, r model.Repo
 	return tx.Commit()
 }
 
-func (s *Store) RegisterLiveActivityToken(ctx context.Context, device, event, telegram, activity, token string, now time.Time) error {
+func (s *Store) RegisterLiveActivityToken(ctx context.Context, device, event, telegram, activity, token string, startSequence int64, now time.Time) error {
 	if !ValidID(event) || !ValidID(activity) || !apns.ValidToken(token) {
 		return ErrInvalid
 	}
@@ -147,8 +154,12 @@ func (s *Store) RegisterLiveActivityToken(ctx context.Context, device, event, te
 	defer tx.Rollback()
 	// A finished or dismissed activity is not resurrected by a late token.
 	var state, oldActivity string
-	err = tx.QueryRowContext(ctx, "SELECT state,activity_id FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", device, event, telegram).Scan(&state, &oldActivity)
-	if err == nil && ((state == "ended" || state == "dismissed") || oldActivity != "" && oldActivity != activity) {
+	var start int64
+	err = tx.QueryRowContext(ctx, "SELECT state,activity_id,start_sequence FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", device, event, telegram).Scan(&state, &oldActivity, &start)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrInvalid
+	}
+	if err == nil && (startSequence <= 0 || start != startSequence || state == "ended" || state == "dismissed" || oldActivity != "" && oldActivity != activity) {
 		return ErrInvalid
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
