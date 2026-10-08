@@ -125,15 +125,24 @@ final class NotificationsUITests: XCTestCase {
         }
         XCTAssertTrue(live.exists, "Live Activity preference missing")
         try await action("capture/notification-settings", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
-        let test = app.buttons["sendNotificationTest"]
-        for _ in 0..<6 {
-            if test.exists && test.isHittable { break }
-            app.swipeUp()
+        for name in ["地震の通知対象地域", "津波の通知対象地域"] {
+            let field = app.textFields[name]
+            scrollTo(field, in: app)
+            XCTAssertTrue(field.exists && field.isHittable, "Region input missing: \(name)")
         }
-        XCTAssertTrue(app.textFields["地震の通知対象地域"].exists)
-        XCTAssertTrue(app.textFields["津波の通知対象地域"].exists)
-        XCTAssertTrue(test.exists, "Own-device notification test control missing")
+        let test = app.buttons["sendNotificationTest"]
+        scrollTo(test, in: app)
+        XCTAssertTrue(test.exists && test.isHittable, "Own-device notification test control missing")
         try await action("capture/notification-test", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+    }
+
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<10 {
+            if element.exists && element.isHittable { return }
+            let start = app.coordinate(withNormalizedOffset: .init(dx: 0.5, dy: 0.75))
+            let end = app.coordinate(withNormalizedOffset: .init(dx: 0.5, dy: 0.45))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
     }
 
     private func assertListTitle(_ title: String, in app: XCUIApplication) {
