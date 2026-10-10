@@ -100,3 +100,41 @@ func TestStationParameterFetchDoesNotBlockReceptionSnapshot(t *testing.T) {
 	close(release)
 	<-done
 }
+
+func TestCancelledStationFetchCanRetryWhenMapReopens(t *testing.T) {
+	var calls atomic.Int32
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			close(started)
+			<-r.Context().Done()
+			return
+		}
+		fmt.Fprint(w, stationFixture)
+	}))
+	defer server.Close()
+	c, _ := New("test-key", "api_key")
+	c.baseURL = server.URL
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { _, err := c.StationCatalog(ctx); done <- err }()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("initial station request did not arrive")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("cancelled initial fetch unexpectedly succeeded")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled station request did not finish")
+	}
+	catalog, err := c.StationCatalog(context.Background())
+	if err != nil || len(catalog.Items) != 1 || calls.Load() != 2 {
+		t.Fatal("reopening the map was blocked by a cancelled request", catalog, err, calls.Load())
+	}
+}

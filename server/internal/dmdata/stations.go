@@ -46,6 +46,11 @@ func (c *Client) StationCatalog(ctx context.Context) (StationCatalog, error) {
 	c.parameterNextAttempt = now.Add(24 * time.Hour)
 	catalog, err := c.fetchStations(ctx, now)
 	if err != nil {
+		// Closing a map cancels its request; allow the next map to retry.
+		// The provider-failure cooldown must not persist a client cancellation.
+		if ctx.Err() != nil {
+			c.parameterNextAttempt = time.Time{}
+		}
 		if c.parameterCatalog != nil {
 			old := *c.parameterCatalog
 			old.Stale = true
