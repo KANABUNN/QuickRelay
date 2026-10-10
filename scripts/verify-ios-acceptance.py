@@ -145,7 +145,7 @@ def notification_control(simulator, evidence):
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
                 command(['xcrun', 'simctl', 'push', simulator, 'jp.kb-dev.quickrelay', str(path)], timeout=30)
                 injections.append(state)
-            elif self.path in ['/capture/' + state for state in ('launched', 'earthquake-list', 'tsunami-list', 'advisory-list', 'intensity-popup', 'intensity-dismissed', 'history-search', 'history-filter', 'earthquake-map', 'tsunami-map', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
+            elif self.path in ['/capture/' + state for state in ('launched', 'earthquake-list', 'tsunami-list', 'advisory-list', 'intensity-popup', 'intensity-dismissed', 'history-search', 'history-filter-controls', 'history-filter', 'earthquake-map', 'tsunami-map', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
                 state = self.path.rsplit('/', 1)[1]
                 try:
                     size = int(self.headers.get('Content-Length', '0'))
@@ -329,7 +329,7 @@ def main():
                     test_run.unlink()
                 assert injections == ['foreground', 'background', 'terminated']
                 assert captures == ['launched', 'foreground', 'background', 'terminated',
-                    'earthquake-list', 'history-search', 'earthquake-map', 'ordinary', 'intensity-popup', 'intensity-dismissed', 'history-filter',
+                    'earthquake-list', 'history-search', 'earthquake-map', 'ordinary', 'intensity-popup', 'intensity-dismissed', 'history-filter-controls', 'history-filter',
                     'tsunami-list', 'tsunami', 'tsunami-map', 'advisory-list', 'advisory',
                     'notification-settings', 'notification-test']
         finally:

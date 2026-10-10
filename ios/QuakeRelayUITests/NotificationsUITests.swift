@@ -113,7 +113,16 @@ final class NotificationsUITests: XCTestCase {
         app.navigationBars.buttons.firstMatch.tap()
         let filters = app.buttons["historyFilters"]
         XCTAssertTrue(filters.waitForExistence(timeout: 5)); filters.tap()
-        app.switches["pinnedOnly"].tap(); app.buttons["完了"].tap()
+        let pinnedOnly = app.switches["pinnedOnly"].firstMatch
+        XCTAssertTrue(pinnedOnly.waitForExistence(timeout: 5) && pinnedOnly.isHittable)
+        // SwiftUI exposes the Toggle row as a switch. Tap its trailing control,
+        // rather than the middle of the label, and verify the value before closing.
+        pinnedOnly.coordinate(withNormalizedOffset: .init(dx: 0.9, dy: 0.5)).tap()
+        try await action("capture/history-filter-controls", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        let enabledFilter = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"), object: pinnedOnly)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabledFilter], timeout: 5), .completed)
+        app.buttons["完了"].tap()
+        XCTAssertTrue(app.staticTexts["絞り込み結果 1件"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["合成震源・通常情報"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["合成震源"].exists)
         try await action("capture/history-filter", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
