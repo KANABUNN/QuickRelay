@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const maxStationCatalogBytes = 8 * 1024 * 1024
+
 type MapStation struct {
 	Code       string  `json:"code"`
 	Name       string  `json:"name"`
@@ -71,8 +73,8 @@ func (c *Client) fetchStations(ctx context.Context, now time.Time) (StationCatal
 	if resp.StatusCode != http.StatusOK {
 		return catalog, errors.New("station catalog authorization or provider failure")
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024+1))
-	if err != nil || len(data) > 2*1024*1024 {
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxStationCatalogBytes+1))
+	if err != nil || len(data) > maxStationCatalogBytes {
 		return catalog, errors.New("invalid station catalog size")
 	}
 	var raw struct {

@@ -11,6 +11,7 @@ struct EventListView: View {
     @EnvironmentObject private var environment: AppEnvironment
     @State private var filter = HistoryFilter()
     @State private var showingFilters = false
+    @State private var searching = false
     @Query private var reports: [ReportEntity]
     private var scope: String { repository.serverIdentity.isEmpty ? environment.settings.serverBaseURL : repository.serverIdentity }
     private var groupedReports: [String: [ReportEntity]] { Dictionary(grouping: reports, by: \.eventId) }
@@ -59,7 +60,8 @@ struct EventListView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $filter.search, prompt: "震源名・地域・発表内容を検索")
+        .searchable(text: $filter.search, isPresented: $searching, prompt: "震源名・地域・発表内容を検索")
+        .onDisappear { searching = false }
         .sheet(isPresented: $showingFilters) {
             HistoryFilterView(filter: $filter, category: category)
                 .presentationDetents([.large])

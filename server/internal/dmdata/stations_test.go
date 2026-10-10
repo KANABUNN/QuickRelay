@@ -61,7 +61,7 @@ func TestStationCatalogRefusesRedirectAndInvalidResponses(t *testing.T) {
 	var leaked atomic.Int32
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { leaked.Add(1) }))
 	defer target.Close()
-	for _, body := range []string{"redirect", `{"status":"error"}`, strings.Repeat("x", 2*1024*1024+1), strings.ReplaceAll(stationFixture, `"35.1"`, `"999"`)} {
+	for _, body := range []string{"redirect", `{"status":"error"}`, strings.Repeat("x", maxStationCatalogBytes+1), strings.ReplaceAll(stationFixture, `"35.1"`, `"999"`)} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if body == "redirect" {
 				http.Redirect(w, r, target.URL, 302)

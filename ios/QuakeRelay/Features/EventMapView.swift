@@ -5,6 +5,7 @@ struct EventMapView: View {
     let report: ReportEntity
     @EnvironmentObject private var repository: EventRepository
     @Environment(\.dismiss) private var dismiss
+    @State private var camera: MapCameraPosition = .automatic
     @State private var catalog: StationCatalogResponse?
     @State private var loading = false
     @State private var error: String?
@@ -22,8 +23,11 @@ struct EventMapView: View {
     }
     private var hasPositions: Bool { epicenter != nil || !observations.points.isEmpty || !areas.isEmpty }
     private var initialPosition: MapCameraPosition {
-        hasPositions ? .automatic : .region(MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36, longitude: 138),
-                                                               span: MKCoordinateSpan(latitudeDelta: 22, longitudeDelta: 25)))
+        if observations.points.isEmpty && areas.isEmpty, let epicenter {
+            return .region(MKCoordinateRegion(center: epicenter, span: MKCoordinateSpan(latitudeDelta: 3, longitudeDelta: 3.5)))
+        }
+        return hasPositions ? .automatic : .region(MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36, longitude: 138),
+                                                                      span: MKCoordinateSpan(latitudeDelta: 22, longitudeDelta: 25)))
     }
     var body: some View {
         NavigationStack {
@@ -36,7 +40,7 @@ struct EventMapView: View {
                         Label("取り消された発表のため、位置情報を描画しません。津波の解除とは異なります。", systemImage: "xmark.octagon")
                             .foregroundStyle(.orange)
                     }
-                    Map(initialPosition: initialPosition) {
+                    Map(position: $camera) {
                         if let epicenter {
                             Annotation(report.numericHypocenter?.isAssumed == true ? "仮定震源" : "震源", coordinate: epicenter) {
                                 Image(systemName: "star.fill").foregroundStyle(.red)
@@ -99,11 +103,13 @@ struct EventMapView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) {
                 Button("閉じる") { dismiss() }.accessibilityIdentifier("closeEventMap")
             } }
-            .task {
+            .task(id: report.id) {
+                camera = initialPosition
+                error = nil
                 guard !MapDataBuilder.observationSections(report).isEmpty else { return }
                 loading = true
                 defer { loading = false }
-                do { catalog = try await repository.stationCatalog() }
+                do { catalog = try await repository.stationCatalog(); camera = initialPosition }
                 catch { self.error = "観測地点の位置情報を取得できません。震源・沿岸と発表内容は引き続き確認できます。" }
             }
         }
