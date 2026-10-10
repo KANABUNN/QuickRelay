@@ -153,6 +153,10 @@ final class APIClient {
         return url.absoluteString
     }
 
+    func stationCatalog() async throws -> StationCatalogResponse {
+        try await request(path: "map/stations", authentication: .device)
+    }
+
     func receiverStatus() async throws -> ReceiverStatusResponse {
         try await request(path: "status", authentication: .device)
     }

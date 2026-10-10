@@ -39,6 +39,7 @@ enum PairingServerBinding {
 
 @MainActor
 final class AppEnvironment: ObservableObject {
+    let historyPreferences = HistoryPreferences()
     @Published private(set) var isPaired = false
     @Published private(set) var pairingError: String?
     @Published private(set) var startupError: String?

@@ -12,6 +12,7 @@ struct QuakeRelayApp: App {
                 .environmentObject(environment)
                 .environmentObject(environment.settings)
                 .environmentObject(environment.repository)
+                .environmentObject(environment.historyPreferences)
                 .environmentObject(environment.router)
                 .environmentObject(environment.notifications)
                 .environmentObject(environment.deviceRegistration)

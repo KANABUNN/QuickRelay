@@ -152,6 +152,7 @@ func serve(c config.Config, st *store.Store) error {
 		app.APNsConfigured = true
 		app.APNsEnvironmentAllowed = sender.Supports
 		app.Source = source
+		app.StationSource = source
 	}
 	listener, err := net.Listen("tcp", c.Listen)
 	if err != nil {

@@ -69,11 +69,27 @@ final class NotificationsUITests: XCTestCase {
         }
         assertListTitle("地震", in: app)
         try await action("capture/earthquake-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        let search = app.searchFields.firstMatch
+        if !search.exists { app.swipeDown() }
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap(); search.typeText("合成震源・通常情報")
+        XCTAssertTrue(app.staticTexts["合成震源・通常情報"].waitForExistence(timeout: 5))
+        try await action("capture/history-search", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "合成震源・通常情報".count))
+        if app.buttons["Cancel"].exists { app.buttons["Cancel"].tap() }
         let ordinary = app.staticTexts["合成震源・通常情報"]
         XCTAssertTrue(ordinary.waitForExistence(timeout: 10))
         ordinary.tap()
         XCTAssertTrue(app.staticTexts["発表区分"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["第9報"].exists)
+        let pin = app.buttons["pinEvent"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 5)); pin.tap()
+        XCTAssertTrue(pin.label.contains("ピンを外す"))
+        app.buttons["showEventMap"].tap()
+        XCTAssertTrue(app.buttons["closeEventMap"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "eventMap").firstMatch.exists)
+        try await action("capture/earthquake-map", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.buttons["closeEventMap"].tap()
         let observations = app.buttons["intensityObservations"]
         for _ in 0..<6 {
             if observations.exists && observations.isHittable { break }
@@ -94,6 +110,23 @@ final class NotificationsUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
         XCTAssertTrue(observations.isHittable, "Closing the sheet should return to the detail")
         try await action("capture/intensity-dismissed", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.navigationBars.buttons.firstMatch.tap()
+        let filters = app.buttons["historyFilters"]
+        XCTAssertTrue(filters.waitForExistence(timeout: 5)); filters.tap()
+        let pinnedOnly = app.switches["pinnedOnly"].firstMatch
+        XCTAssertTrue(pinnedOnly.waitForExistence(timeout: 5) && pinnedOnly.isHittable)
+        // SwiftUI exposes the Toggle row as a switch. Tap its trailing control,
+        // rather than the middle of the label, and verify the value before closing.
+        pinnedOnly.coordinate(withNormalizedOffset: .init(dx: 0.9, dy: 0.5)).tap()
+        try await action("capture/history-filter-controls", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        let enabledFilter = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"), object: pinnedOnly)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabledFilter], timeout: 5), .completed)
+        app.buttons["完了"].tap()
+        XCTAssertTrue(app.staticTexts["絞り込み結果 1件"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["合成震源・通常情報"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["合成震源"].exists)
+        try await action("capture/history-filter", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.buttons["解除"].tap()
         app.tabBars.buttons["津波"].tap()
         assertListTitle("津波", in: app)
         try await action("capture/tsunami-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
@@ -107,6 +140,11 @@ final class NotificationsUITests: XCTestCase {
         if !height.waitForExistence(timeout: 3) { app.swipeUp() }
         XCTAssertTrue(height.waitForExistence(timeout: 5))
         try await action("capture/tsunami", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.buttons["showEventMap"].tap()
+        XCTAssertTrue(app.buttons["closeEventMap"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["宮崎県"].firstMatch.waitForExistence(timeout: 5))
+        try await action("capture/tsunami-map", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
+        app.buttons["closeEventMap"].tap()
         app.tabBars.buttons["関連情報"].tap()
         assertListTitle("関連情報", in: app)
         try await action("capture/advisory-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)

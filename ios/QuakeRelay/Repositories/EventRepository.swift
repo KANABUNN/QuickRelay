@@ -177,6 +177,7 @@ final class EventRepository: ObservableObject {
     @Published private(set) var lastServerSequence: UInt64 = 0
     @Published private(set) var latestCommittedSequence: UInt64 = 0
     @Published private(set) var lastError: String?
+    @Published private(set) var serverIdentity = ""
 
     private let context: ModelContext
     private let api: APIClient
@@ -185,6 +186,10 @@ final class EventRepository: ObservableObject {
         self.context = context
         self.api = api
         reloadCursorState()
+    }
+
+    func stationCatalog() async throws -> StationCatalogResponse {
+        try await api.stationCatalog()
     }
 
     func sourceDocument(reportID: String) async throws -> Data {
@@ -196,6 +201,7 @@ final class EventRepository: ObservableObject {
             let cursor = try SyncPageApplier.fetchOrCreateCursor(in: context)
             lastServerSequence = UInt64(max(0, cursor.lastServerSequence))
             latestCommittedSequence = UInt64(max(0, cursor.latestCommittedSequence))
+            serverIdentity = cursor.serverIdentity ?? ""
             lastSyncAt = cursor.lastSyncAt
         } catch {
             lastError = error.localizedDescription

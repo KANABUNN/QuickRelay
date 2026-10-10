@@ -38,6 +38,7 @@ targets:
         excludes:
           - Resources
     resources:
+      - path: QuakeRelay/Resources/MapRegions.json
       - path: QuakeRelay/Resources/Assets.xcassets
       - path: QuakeRelay/Resources/PrivacyInfo.xcprivacy
     info:

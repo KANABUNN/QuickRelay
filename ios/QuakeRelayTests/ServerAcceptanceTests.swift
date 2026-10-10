@@ -114,7 +114,7 @@ final class ServerAcceptanceTests: XCTestCase {
         let stored = ReportEntity(dto: tsunami.report, serverSequence: Int64(tsunami.report.serverSequence))
         XCTAssertTrue(stored.bulletin?.sections?.contains(where: { $0.rows?.contains(where: { $0.value == "巨大" }) == true }) == true)
         let source = try await api.sourceDocument(reportID: tsunami.report.id)
-        XCTAssertTrue(String(decoding: source, as: UTF8.self).contains("合成予報区"))
+        XCTAssertTrue(String(decoding: source, as: UTF8.self).contains("宮崎県"))
         XCTAssertTrue(tail.items.contains { $0.event.category == "advisory" && $0.report.eventType == "nankai_info" })
         XCTAssertTrue(tail.items.contains { $0.report.telegramType == "WEPA60" && $0.report.bulletin?.document?.format == "a/n" })
         preferences.eventTypes += ["tsunami_warning", "tsunami_info", "nankai_info", "seismic_advisory", "earthquake_data"]

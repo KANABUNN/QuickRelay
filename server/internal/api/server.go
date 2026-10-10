@@ -17,6 +17,7 @@ import (
 type SourceSnapshotter interface{ Snapshot() dmdata.Stats }
 
 type Server struct {
+	StationSource          StationProvider
 	TestSender             NotificationTestSender
 	Source                 SourceSnapshotter
 	Store                  *store.Store
@@ -44,6 +45,7 @@ func New(st *store.Store, secret string) *Server {
 	s.mux.HandleFunc("DELETE /api/v1/devices/me/live-activity/start-token", s.auth(s.clearLiveStartToken))
 	s.mux.HandleFunc("PUT /api/v1/devices/me/live-activity/token", s.auth(s.liveActivityToken))
 	s.mux.HandleFunc("POST /api/v1/devices/me/live-activity/ended", s.auth(s.liveActivityEnded))
+	s.mux.HandleFunc("GET /api/v1/map/stations", s.auth(s.mapStations))
 	s.HistoryRoutes()
 	s.StatusRoutes()
 	return s
