@@ -17,12 +17,7 @@ struct EventListView: View {
     private var visibleEvents: [EventEntity] {
         let groups = groupedReports
         return categoryEvents.filter { event in
-            let searchable = filter.search.isEmpty ? "" : ([event.numericHypocenter.epicenter ?? "", event.displayTitle] +
-                (groups[event.id] ?? []).flatMap { report in
-                    [report.title, report.body] + (report.bulletin?.sections ?? []).flatMap {
-                        [$0.title, $0.text ?? ""] + ($0.rows ?? []).map(\.value)
-                    }
-                }).joined(separator: " ")
+            let searchable = searchText(for: event, reports: groups[event.id] ?? [])
             return filter.matches(event, searchText: searchable, unread: history.isUnread(event, scope: scope),
                                   pinned: history.isPinned(event.id, scope: scope))
         }.sorted {
@@ -32,6 +27,21 @@ struct EventListView: View {
             return $0.id < $1.id
         }
     }
+    private func searchText(for event: EventEntity, reports: [ReportEntity]) -> String {
+        guard !filter.search.isEmpty else { return "" }
+        var values: [String] = [event.numericHypocenter.epicenter ?? "", event.displayTitle]
+        for report in reports {
+            values.append(report.title)
+            values.append(report.body)
+            for section in report.bulletin?.sections ?? [] {
+                values.append(section.title)
+                if let text = section.text { values.append(text) }
+                for row in section.rows ?? [] { values.append(row.value) }
+            }
+        }
+        return values.joined(separator: " ")
+    }
+
     @EnvironmentObject private var repository: EventRepository
     @Query(sort: \EventEntity.latestReportAt, order: .reverse) private var events: [EventEntity]
 
