@@ -1351,6 +1351,33 @@
           }
         }
       }
+    },
+    "/api/v1/map/stations": {
+      "get": {
+        "summary": "Authenticated earthquake observation station locations",
+        "description": "Requires the existing DMDATA parameter.earthquake permission on the VPS. Cached for 72 hours; a failed refresh returns the last valid catalog with stale=true. No DMDATA credential is returned.",
+        "responses": {
+          "200": {
+            "description": "Station catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationCatalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Installation authentication required"
+          },
+          "502": {
+            "description": "Provider catalog unavailable"
+          },
+          "503": {
+            "description": "Map station provider not configured"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1406,6 +1433,90 @@
           "requested_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "StationCatalog": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "source",
+          "version",
+          "change_time",
+          "fetched_at",
+          "stale",
+          "items"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "source": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "change_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "name",
+                "region_name",
+                "city_name",
+                "latitude",
+                "longitude",
+                "status"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "region_name": {
+                  "type": "string"
+                },
+                "city_name": {
+                  "type": "string"
+                },
+                "latitude": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "longitude": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                "status": {
+                  "enum": [
+                    "現",
+                    "変更",
+                    "新規",
+                    "廃止"
+                  ]
+                }
+              }
+            }
           }
         }
       }

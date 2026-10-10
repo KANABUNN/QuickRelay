@@ -7,3 +7,7 @@ iOSは `https://対象ドメイン/api/v1` を接続先にします。端末別B
 報・イベント・ページは[共通JSON Schema](../contracts/api.schema.json)、通常通知は[APNs Schema](../contracts/push-payload.schema.json)を参照してください。`apns-send` の接続テスト通知は通常の報通知と別形式です。
 
 同期cursorと報数の違いは[イベント仕様](event-semantics.md)、具体的なコマンドとendpoint表は[サーバーREADME](../server/README.md)を参照してください。
+
+## 観測地点の地図パラメータ
+
+`GET /api/v1/map/stations` は端末認証付きで位置情報を返します。応答と取得制限は [履歴・差分・地図](history-and-maps.md) および OpenAPI を参照してください。

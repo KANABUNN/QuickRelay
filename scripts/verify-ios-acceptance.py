@@ -76,7 +76,7 @@ def frames():
 
     extras = [
         ('VXSE53', 'earthquake-information', '20261005000002', '震源・震度情報',
-         {'earthquake': {'originTime': at.isoformat(), 'hypocenter': {'name': '合成震源・通常情報'},
+         {'earthquake': {'originTime': at.isoformat(), 'hypocenter': {'name': '合成震源・通常情報', 'coordinate': {'latitude': {'value': '35.0'}, 'longitude': {'value': '139.0'}}},
                          'magnitude': {'value': '5.0'}}, 'intensity': {'maxInt': '4',
              'prefectures': [{'name': '合成県', 'maxInt': '4', 'regions': [
                  {'name': '合成地方', 'maxInt': '4', 'cities': [
@@ -84,7 +84,7 @@ def frames():
                          {'name': f'合成観測地点{i:02d}', 'int': '4' if i == 1 else '3'}
                          for i in range(1, 21)]}]}]}]}}),
         ('VTSE41', 'tsunami-information', '20261005000002 20261005000003', '合成津波警報',
-         {'tsunami': {'forecasts': [{'code': '999', 'name': '合成予報区',
+         {'tsunami': {'forecasts': [{'code': '760', 'name': '宮崎県',
              'kind': {'code': '53', 'name': '大津波警報', 'lastKind': {'code': '00', 'name': 'なし'}},
              'firstHeight': {'condition': '津波到達中と推測'},
              'maxHeight': {'height': {'type': '津波の高さ', 'unit': 'm', 'value': None, 'condition': '巨大'}}}]}}),
@@ -145,7 +145,7 @@ def notification_control(simulator, evidence):
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
                 command(['xcrun', 'simctl', 'push', simulator, 'jp.kb-dev.quickrelay', str(path)], timeout=30)
                 injections.append(state)
-            elif self.path in ['/capture/' + state for state in ('launched', 'earthquake-list', 'tsunami-list', 'advisory-list', 'intensity-popup', 'intensity-dismissed', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
+            elif self.path in ['/capture/' + state for state in ('launched', 'earthquake-list', 'tsunami-list', 'advisory-list', 'intensity-popup', 'intensity-dismissed', 'history-search', 'history-filter', 'earthquake-map', 'tsunami-map', 'tsunami', 'advisory', 'ordinary', 'notification-settings', 'notification-test') + states]:
                 state = self.path.rsplit('/', 1)[1]
                 try:
                     size = int(self.headers.get('Content-Length', '0'))
@@ -329,8 +329,8 @@ def main():
                     test_run.unlink()
                 assert injections == ['foreground', 'background', 'terminated']
                 assert captures == ['launched', 'foreground', 'background', 'terminated',
-                    'earthquake-list', 'ordinary', 'intensity-popup', 'intensity-dismissed',
-                    'tsunami-list', 'tsunami', 'advisory-list', 'advisory',
+                    'earthquake-list', 'history-search', 'earthquake-map', 'ordinary', 'intensity-popup', 'intensity-dismissed', 'history-filter',
+                    'tsunami-list', 'tsunami', 'tsunami-map', 'advisory-list', 'advisory',
                     'notification-settings', 'notification-test']
         finally:
             if relay.poll() is None:

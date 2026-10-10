@@ -28,13 +28,16 @@ type Stats struct {
 	LastError   string    `json:"last_error,omitempty"`
 }
 type Client struct {
-	token, authMode   string
-	subscription      socketRequest
-	http              *http.Client
-	baseURL           string
-	allowTestEndpoint bool
-	mu                sync.Mutex
-	stats             Stats
+	parameterMu          sync.Mutex
+	parameterCatalog     *StationCatalog
+	parameterNextAttempt time.Time
+	token, authMode      string
+	subscription         socketRequest
+	http                 *http.Client
+	baseURL              string
+	allowTestEndpoint    bool
+	mu                   sync.Mutex
+	stats                Stats
 }
 
 type socketRequest struct {

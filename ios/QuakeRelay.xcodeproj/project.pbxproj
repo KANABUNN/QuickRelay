@@ -61,6 +61,14 @@
         AA1000000000000000000003 /* QuickRelayLiveActivity.appex in Embed App Extensions */ = {isa=PBXBuildFile; fileRef=FA1000000000000000000003; settings={ATTRIBUTES=(RemoveHeadersOnCopy,);};};
         AA1000000000000000000004 /* PrivacyInfo.xcprivacy in Resources */ = {isa=PBXBuildFile; fileRef=FA1000000000000000000004;};
 		7CF1FBD9F28A9D1CAE52EB24 /* live-activity.valid.json in Resources */ = {isa=PBXBuildFile;fileRef=AD6DD0FDDA7D9E3620CB1A07;};
+		DAEF00C44C355DF106F9764A /* HistoryPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B5CC04B6DD0FD1D4D703D30 /* HistoryPreferences.swift */; };
+		D619C9C82D59365014220CA2 /* HistoryFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81AA2C53681B69F6C0FAC358 /* HistoryFilterView.swift */; };
+		0D4C76786284BC024C60D06F /* ReportChanges.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0B1C9FDC92D1088A923C13 /* ReportChanges.swift */; };
+		0E8B0CAF2A3AE61DE6EE03A0 /* ReportChangesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C3954598910C522F72618FE /* ReportChangesView.swift */; };
+		E550DAE5302B0E0E4119397A /* EventMapData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14BAD606E63B7EB83164A763 /* EventMapData.swift */; };
+		FF7D4467E94C8096A0E3D021 /* EventMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12738831B98DE5D1095E650C /* EventMapView.swift */; };
+		E5C3D756463A4B4C8726C314 /* MediumFeaturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6CFBDD407067E004D1CE6D /* MediumFeaturesTests.swift */; };
+		D18B63D49B313602BFF9AC38 /* MapRegions.json in Resources */ = {isa = PBXBuildFile; fileRef = 218AC9D82F334049DC2EAA21 /* MapRegions.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -137,6 +145,14 @@
         FA1000000000000000000003 /* QuickRelayLiveActivity.appex */ = {isa=PBXFileReference; explicitFileType="wrapper.app-extension"; includeInIndex=0; path=QuickRelayLiveActivity.appex; sourceTree=BUILT_PRODUCTS_DIR;};
         FA1000000000000000000004 /* PrivacyInfo.xcprivacy */ = {isa=PBXFileReference; lastKnownFileType=text.xml; path="../QuakeRelay/Resources/PrivacyInfo.xcprivacy"; sourceTree="<group>";};
 		AD6DD0FDDA7D9E3620CB1A07 /* live-activity.valid.json */ = {isa=PBXFileReference;lastKnownFileType=text.json;path="../../contracts/examples/live-activity.valid.json";sourceTree="<group>";};
+		3B5CC04B6DD0FD1D4D703D30 /* HistoryPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/HistoryPreferences.swift"; sourceTree = "<group>"; };
+		81AA2C53681B69F6C0FAC358 /* HistoryFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/HistoryFilterView.swift"; sourceTree = "<group>"; };
+		EC0B1C9FDC92D1088A923C13 /* ReportChanges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReportChanges.swift"; sourceTree = "<group>"; };
+		8C3954598910C522F72618FE /* ReportChangesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReportChangesView.swift"; sourceTree = "<group>"; };
+		14BAD606E63B7EB83164A763 /* EventMapData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/EventMapData.swift"; sourceTree = "<group>"; };
+		12738831B98DE5D1095E650C /* EventMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/EventMapView.swift"; sourceTree = "<group>"; };
+		4A6CFBDD407067E004D1CE6D /* MediumFeaturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MediumFeaturesTests.swift"; sourceTree = "<group>"; };
+		218AC9D82F334049DC2EAA21 /* MapRegions.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Resources/MapRegions.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -195,6 +211,13 @@
 		000000000000000000000004 /* QuakeRelay */ = {
 			isa = PBXGroup;
 			children = (
+				218AC9D82F334049DC2EAA21 /* MapRegions.json */,
+				12738831B98DE5D1095E650C /* EventMapView.swift */,
+				14BAD606E63B7EB83164A763 /* EventMapData.swift */,
+				8C3954598910C522F72618FE /* ReportChangesView.swift */,
+				EC0B1C9FDC92D1088A923C13 /* ReportChanges.swift */,
+				81AA2C53681B69F6C0FAC358 /* HistoryFilterView.swift */,
+				3B5CC04B6DD0FD1D4D703D30 /* HistoryPreferences.swift */,
 				F57CE9B9137E00B704A7728D /* LiveActivityCoordinator.swift */,
 				105D8951174E07CEF05244AC /* QuickRelayActivityAttributes.swift */,
 				64A2B9FEAE4EEBD6D8AB27B2 /* NotificationTestView.swift */,
@@ -230,6 +253,7 @@
 		000000000000000000000005 /* QuakeRelayTests */ = {
 			isa = PBXGroup;
 			children = (
+				4A6CFBDD407067E004D1CE6D /* MediumFeaturesTests.swift */,
 				AD6DD0FDDA7D9E3620CB1A07 /* live-activity.valid.json */,
 				3EBA60FE3E4BC09BEB197076 /* PriorityFeaturesTests.swift */,
 				F00000000000000000000020 /* TestFixtures.swift */,
@@ -390,6 +414,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D18B63D49B313602BFF9AC38 /* MapRegions.json in Resources */,
 				A00000000000000000000015 /* Assets.xcassets in Resources */,
 				A90000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -438,6 +463,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FF7D4467E94C8096A0E3D021 /* EventMapView.swift in Sources */,
+				E550DAE5302B0E0E4119397A /* EventMapData.swift in Sources */,
+				0E8B0CAF2A3AE61DE6EE03A0 /* ReportChangesView.swift in Sources */,
+				0D4C76786284BC024C60D06F /* ReportChanges.swift in Sources */,
+				D619C9C82D59365014220CA2 /* HistoryFilterView.swift in Sources */,
+				DAEF00C44C355DF106F9764A /* HistoryPreferences.swift in Sources */,
 				FAA1A194B2262E7098E06B4C /* LiveActivityCoordinator.swift in Sources */,
 				61FDC97E1E7F1551CE810F50 /* QuickRelayActivityAttributes.swift in Sources */,
 				44A88560482F1BEAF25D8FAD /* NotificationTestView.swift in Sources */,
@@ -469,6 +500,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E5C3D756463A4B4C8726C314 /* MediumFeaturesTests.swift in Sources */,
 				875739E64A611F9D613C93AC /* PriorityFeaturesTests.swift in Sources */,
 				A00000000000000000000016 /* TestFixtures.swift in Sources */,
 				A00000000000000000000017 /* APIDecodingTests.swift in Sources */,

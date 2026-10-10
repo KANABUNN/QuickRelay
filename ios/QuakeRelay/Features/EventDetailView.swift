@@ -7,6 +7,12 @@ struct EventDetailView: View {
     let eventID: String
     let highlightedReportID: String?
 
+    @EnvironmentObject private var history: HistoryPreferences
+    @EnvironmentObject private var environment: AppEnvironment
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showingMap = false
+    @State private var isVisible = false
+    private var scope: String { repository.serverIdentity.isEmpty ? environment.settings.serverBaseURL : repository.serverIdentity }
     @EnvironmentObject private var repository: EventRepository
     @Query private var events: [EventEntity]
     @Query private var reports: [ReportEntity]
@@ -30,6 +36,9 @@ struct EventDetailView: View {
                 ScrollViewReader { proxy in
                     List {
                         latestSection(event)
+                        if let latestReport {
+                            ReportChangesView(report: latestReport, previous: ReportComparison.previous(to: latestReport, in: reports))
+                        }
                         if event.isWarningProduct && !event.isCancelled { forecastReferenceSection }
                         if let latestReport, let bulletin = latestReport.bulletin {
                             Section("発表内容") { BulletinContent(bulletin: bulletin, reportID: latestReport.id) }
@@ -51,6 +60,26 @@ struct EventDetailView: View {
         }
         .navigationTitle(events.first?.displayTitle ?? "情報の詳細")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(history.isPinned(eventID, scope: scope) ? "ピンを外す" : "ピン留め", systemImage: history.isPinned(eventID, scope: scope) ? "pin.fill" : "pin") {
+                    history.togglePinned(eventID, scope: scope)
+                }.accessibilityIdentifier("pinEvent")
+            }
+            if events.first?.category == "earthquake" || events.first?.category == "tsunami" {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("地図で見る", systemImage: "map") { showingMap = true }
+                        .disabled(latestReport == nil).accessibilityIdentifier("showEventMap")
+                }
+            }
+        }
+        .sheet(isPresented: $showingMap) {
+            if let latestReport { EventMapView(report: latestReport).presentationDetents([.large]) }
+        }
+        .onAppear { isVisible = true; markReadIfVisible() }
+        .onDisappear { isVisible = false }
+        .onChange(of: events.first?.latestRevision) { _, _ in markReadIfVisible() }
+        .onChange(of: scenePhase) { _, _ in markReadIfVisible() }
         .refreshable {
             _ = await repository.syncAll()
         }
@@ -66,6 +95,12 @@ struct EventDetailView: View {
         Section("最新状態") {
             LabeledContent("種別", value: RelayEventType(rawValue: event.eventType)?.displayName ?? event.eventType)
             LabeledContent("発表時刻", value: event.latestReportAt.formatted(date: .abbreviated, time: .standard))
+            if event.category == "tsunami", let report = TsunamiPublication.latest(in: reports, eventID: eventID),
+               let status = TsunamiPublication(report: report).status {
+                Label(status, systemImage: report.isCancelled ? "xmark.octagon" : "water.waves")
+                    .font(.subheadline.bold()).foregroundStyle(report.isCancelled ? .orange : .blue)
+                LabeledContent("警報・注意報の発表時刻", value: (report.occurredAt ?? report.receivedAt).formatted(date: .abbreviated, time: .standard))
+            }
             HypocenterFields(value: event.numericHypocenter, showMagnitudeAndDepth: !event.isWarningProduct)
             if let intensity = event.maxIntensity {
                 LabeledContent(event.intensityLabel, value: intensity)
@@ -141,6 +176,11 @@ struct EventDetailView: View {
         return reports.first { $0.serverSequence == Int64(version) }
     }
 
+    private func markReadIfVisible() {
+        guard isVisible, scenePhase == .active, let event = events.first else { return }
+        history.markRead(event, scope: scope)
+    }
+
     private func scrollToHighlightedReport(using proxy: ScrollViewProxy) {
         guard let highlightedReportID else { return }
         DispatchQueue.main.async {
@@ -167,6 +207,9 @@ private struct ReportTimelineRow: View {
             Text(report.body)
                 .font(.subheadline)
                 .textSelection(.enabled)
+            if let status = TsunamiPublication(report: report).status {
+                Text(status).font(.caption.bold()).foregroundStyle(.blue)
+            }
             if let value = report.numericHypocenter {
                 DisclosureGroup("数値の詳細") {
                     HypocenterFields(value: value, showMagnitudeAndDepth: report.classification != "eew.warning" && report.eventType != "eew_warning")
