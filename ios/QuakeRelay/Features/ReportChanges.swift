@@ -110,6 +110,7 @@ enum ReportPublicationOrder {
         if lhs.isEEW, rhs.isEEW, let a = lhs.revision, let b = rhs.revision, a != b { return a < b }
         let a = lhs.occurredAt ?? lhs.receivedAt, b = rhs.occurredAt ?? rhs.receivedAt
         if a != b { return a < b }
+        if !lhs.isEEW, let a = lhs.pressTime, let b = rhs.pressTime, a != b { return a < b }
         func rank(_ report: ReportEntity) -> Int {
             report.isCancelled ? 3 : report.infoType == "訂正" ? 2 : report.isFinal ? 1 : 0
         }

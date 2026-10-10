@@ -121,6 +121,7 @@ struct ReportDTO: Codable, Equatable, Sendable {
     var category: String? = nil
     var infoType: String? = nil
     var bulletin: BulletinDTO? = nil
+    var pressTime: String? = nil
 
     var numericHypocenter: HypocenterDTO? {
         if let hypocenter { return hypocenter }

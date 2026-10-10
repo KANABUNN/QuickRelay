@@ -94,6 +94,17 @@ final class MediumFeaturesTests: XCTestCase {
         let observation = report("observed", sequence: 4, type: "VTSE51", time: "2026-01-01T02:00:00Z")
         XCTAssertEqual(TsunamiPublication.latest(in: [cancel, original, observation], eventID: "event")?.id, "cancel")
     }
+    func testTsunamiStateUsesPressTimeBeforeCorrectionOrCancellationTieBreak() {
+        let cancelled = report("cancel", sequence: 1, cancelled: true)
+        cancelled.pressTime = ServerDateParser.parse("2026-01-01T01:00:01Z")
+        let corrected = report("corrected", sequence: 2, infoType: "訂正", sections: [area("宮崎県", kind: "津波警報")])
+        corrected.pressTime = ServerDateParser.parse("2026-01-01T01:00:02Z")
+        XCTAssertEqual(TsunamiPublication.latest(in: [cancelled, corrected], eventID: "event")?.id, "corrected")
+        var dto = TestFixtures.report()
+        dto.pressTime = "2026-01-01T01:00:02Z"
+        let stored = ReportEntity(dto: dto, serverSequence: 1)
+        XCTAssertEqual(stored.pressTime, ServerDateParser.parse(dto.pressTime))
+    }
     func testTsunamiHeightAndTargetAreaChangesNeverTurnMissingHeightIntoZero() {
         let old = report("old", sequence: 1, sections: [area("宮崎県", kind: "津波警報", height: "3 m")])
         let new = report("new", sequence: 2, sections: [area("宮崎県", kind: "津波警報解除"),area("高知県", kind: "津波注意報", height: "1 m")])
