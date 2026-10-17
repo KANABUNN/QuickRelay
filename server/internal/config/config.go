@@ -13,13 +13,13 @@ import (
 )
 
 type Config struct {
-	DMDATAClassifications                        []string
-	Mode, Listen, DBPath, PairingSecret          string
-	DMDATAToken, DMDATAAuthMode                  string
-	APNsTeam, APNsKeyID, APNsBundle, APNsKeyFile string
-	APNsEnvironment                              string
-	APNsSandboxKeyID, APNsSandboxKeyFile         string
-	APNsProductionKeyID, APNsProductionKeyFile   string
+	DMDATAClassifications                         []string
+	Mode, Listen, DBPath, PairingSecret           string
+	DMDATAToken, DMDATAAuthMode, DMDATAFormatMode string
+	APNsTeam, APNsKeyID, APNsBundle, APNsKeyFile  string
+	APNsEnvironment                               string
+	APNsSandboxKeyID, APNsSandboxKeyFile          string
+	APNsProductionKeyID, APNsProductionKeyFile    string
 }
 
 // LoadEnv reads literal KEY=value entries. It never invokes a shell or expands variables.
@@ -66,6 +66,7 @@ func Load() Config {
 		return fallback
 	}
 	return Config{
+		DMDATAFormatMode:      get("DMDATA_FORMAT_MODE", "raw"),
 		DMDATAClassifications: strings.Split(get("DMDATA_CLASSIFICATIONS", "eew.forecast,eew.warning,telegram.earthquake"), ","),
 		Mode:                  get("RELAY_MODE", "live"), Listen: get("LISTEN_ADDR", "127.0.0.1:8080"), DBPath: get("DATABASE_PATH", "quakerelay.db"),
 		PairingSecret: os.Getenv("PAIRING_SECRET"), DMDATAToken: get("DMDATA_API_KEY", os.Getenv("DMDATA_TOKEN")), DMDATAAuthMode: get("DMDATA_AUTH_MODE", "api_key"),
@@ -100,7 +101,7 @@ func (c Config) Validate() error {
 		if _, err := c.APNsCredentials(); err != nil {
 			return err
 		}
-		if _, err := dmdata.NewWithClassifications(c.DMDATAToken, c.DMDATAAuthMode, c.DMDATAClassifications); err != nil {
+		if _, err := dmdata.NewWithFormat(c.DMDATAToken, c.DMDATAAuthMode, c.DMDATAClassifications, c.DMDATAFormatMode); err != nil {
 			return err
 		}
 	}

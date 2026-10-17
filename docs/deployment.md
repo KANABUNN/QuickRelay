@@ -208,7 +208,7 @@ Debug実機はsandbox/development、TestFlightはproductionです。`APNS_ENVIRO
 
 ## 5. DMDATA設定とlive起動
 
-[DMDATA Socket Start v2](https://dmdata.jp/docs/reference/api/v2/socket.start/)に合わせ、契約済み区分を DMDATA_CLASSIFICATIONS へ指定します。既定は eew.forecast,eew.warning,telegram.earthquake。未知区分や重複は設定エラーです。typesを省略し、formats=[json,a/n,binary]、test=no、appName=Quick Relayで購読します。
+[DMDATA Socket Start v2](https://dmdata.jp/docs/reference/api/v2/socket.start/)に合わせ、契約済み区分を DMDATA_CLASSIFICATIONS へ指定します。既定は eew.forecast,eew.warning,telegram.earthquake。未知区分や重複は設定エラーです。typesを省略し、formatMode=raw（DMDATA_FORMAT_MODE=jsonで変換JSONへ切替可能）、test=no、appName=Quick Relayで購読します。formatsは併用しません。[原電文移行の検証とロールバック](dmdata-raw-migration.md)も参照してください。
 
 [受信対象と表示](earthquake-tsunami-products.md)の20種を処理します。サーバーを先に配備してからアプリを更新します。/readyzに加えて正規化失敗数を確認してください。切断区間の自動補完はありません。
 

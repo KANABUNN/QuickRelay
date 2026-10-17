@@ -1,0 +1,53 @@
+{
+  "_schema": {
+    "type": "eew-information",
+    "version": "1.0.0"
+  },
+  "pressDateTime": "2024-04-17T14:14:57Z",
+  "eventId": "20240417231454",
+  "serialNo": "1",
+  "status": "通常",
+  "infoType": "発表",
+  "reportDateTime": "2024-04-17T23:14:57+09:00",
+  "title": "緊急地震速報（地震動予報）",
+  "headline": "",
+  "body": {
+    "isLastInfo": false,
+    "isCanceled": false,
+    "isWarning": false,
+    "earthquake": {
+      "originTime": "2024-04-17T23:14:47+09:00",
+      "hypocenter": {
+        "name": "豊後水道",
+        "depth": {
+          "value": "40",
+          "condition": ""
+        },
+        "coordinate": {
+          "latitude": {
+            "value": "33.1"
+          },
+          "longitude": {
+            "value": "132.4"
+          }
+        },
+        "accuracy": {
+          "epicenters": [
+            "4",
+            "4"
+          ],
+          "magnitudeCalculation": "2"
+        }
+      },
+      "magnitude": {
+        "value": "4.2"
+      }
+    },
+    "intensity": {
+      "forecastMaxInt": {
+        "from": "3",
+        "to": "3"
+      }
+    }
+  }
+}

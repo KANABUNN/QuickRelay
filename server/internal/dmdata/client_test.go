@@ -26,7 +26,7 @@ func TestSocketStartPingPongFreshTicketAndCleanup(t *testing.T) {
 			}
 			var body map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&body)
-			if body["formatMode"] != nil || body["types"] != nil || !reflect.DeepEqual(body["formats"], []any{"json", "a/n", "binary"}) || body["test"] != "no" || body["appName"] != "Quick Relay" {
+			if body["formatMode"] != "raw" || body["types"] != nil || body["formats"] != nil || body["test"] != "no" || body["appName"] != "Quick Relay" {
 				t.Error("bad start options")
 			}
 			starts.Add(1)
@@ -123,7 +123,7 @@ func TestSubscriptionMatchesConfiguredContracts(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
 			t.Error(err)
 		}
-		if got.Test != "no" || !reflect.DeepEqual(got.Formats, []string{"json", "a/n", "binary"}) || got.AppName != "Quick Relay" ||
+		if got.Test != "no" || got.FormatMode != "raw" || got.AppName != "Quick Relay" ||
 			!reflect.DeepEqual(got.Classifications, []string{"eew.warning", "telegram.earthquake"}) ||
 			len(got.Types) != 0 {
 			t.Error("subscription does not match configured contracts")
@@ -179,8 +179,46 @@ func TestRunReconnectsWithFreshTicketsAfterMalformedFrame(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 	received := false
-	c.Run(ctx, func(context.Context, []byte) error { received = true; cancel(); return nil })
+	c.Run(ctx, func(_ context.Context, data []byte) error {
+		if strings.Contains(string(data), "reconnected") {
+			received = true
+			cancel()
+		}
+		return nil
+	})
 	if !received || starts.Load() != 2 || closes.Load() != 2 || c.Snapshot().Reconnects != 1 {
 		t.Fatal("reconnect failed", starts.Load(), closes.Load(), c.Snapshot())
+	}
+}
+
+func TestFormatModeRollbackAndValidation(t *testing.T) {
+	for _, mode := range []string{"raw", "json", ""} {
+		c, err := NewWithFormat("test-key", "api_key", nil, mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := json.Marshal(c.subscription)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]any
+		_ = json.Unmarshal(data, &body)
+		want := mode
+		if want == "" {
+			want = "raw"
+		}
+		if mode == "json" {
+			if body["formatMode"] != nil || !reflect.DeepEqual(body["formats"], []any{"json", "a/n", "binary"}) {
+				t.Fatal("JSON rollback differs from previous subscription", body)
+			}
+		} else if body["formatMode"] != want || body["formats"] != nil {
+			t.Fatal("incompatible socket request", body)
+		}
+		if body["types"] != nil {
+			t.Fatal("unexpected type filter", body)
+		}
+	}
+	if _, err := NewWithFormat("test-key", "api_key", nil, "unknown"); err == nil {
+		t.Fatal("unknown mode accepted")
 	}
 }

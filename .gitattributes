@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# Preserve the byte-for-byte official samples and their published checksums.
+server/internal/dmdata/testdata/jma/*.xml -text -whitespace
