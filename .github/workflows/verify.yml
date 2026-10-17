@@ -42,7 +42,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y caddy shellcheck gnupg
-          shellcheck deploy/install.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh
+          shellcheck deploy/install.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh ios/Scripts/test-watch.sh
           sh scripts/verify-deploy.sh
           python3 -m unittest discover -s deploy/operations -p 'test_*.py' -v
       - name: Secret patterns and whitespace
@@ -59,3 +59,5 @@ jobs:
           persist-credentials: false
       - name: Build and test the existing Xcode project
         run: sh ios/Scripts/test.sh
+      - name: Build the watchOS companion for simulator
+        run: sh ios/Scripts/test-watch.sh

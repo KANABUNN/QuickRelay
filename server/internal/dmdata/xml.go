@@ -340,6 +340,15 @@ func parseXML(data []byte, code string, p product) (converted, []byte, error) {
 	top := object{"_schema": object{"type": p.schema, "version": "1.0.0"}, "eventId": head.get("EventID"), "serialNo": head.get("Serial"),
 		"pressDateTime": press, "status": control.get("Status"), "infoType": info, "reportDateTime": report,
 		"title": head.get("Title"), "headline": head.get("Headline", "Text"), "body": b}
+	// JMA publishes an explicit expiry for tsunami forecasts when applicable.
+	// Missing validity is unknown; notification TTL is not a bulletin expiry.
+	if valid := head.child("ValidDateTime"); valid != nil {
+		parsed, err := time.Parse(time.RFC3339, valid.value())
+		if err != nil || parsed.IsZero() {
+			return out, nil, errors.New("invalid XML expiry time")
+		}
+		top["validDateTime"] = parsed
+	}
 	details, err := json.Marshal(top)
 	if err != nil {
 		return out, nil, errors.New("XML adapter failed")

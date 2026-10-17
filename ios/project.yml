@@ -4,6 +4,7 @@ options:
   bundleIdPrefix: jp.kb-dev
   deploymentTarget:
     iOS: "17.0"
+    watchOS: "10.0"
   createIntermediateGroups: true
   groupSortPosition: top
   generateEmptyDirectories: true
@@ -84,6 +85,12 @@ targets:
     dependencies:
       - target: QuickRelayLiveActivity
         embed: true
+      - target: QuickRelayWatch
+        embed: true
+        link: false
+        copy:
+          destination: wrapper
+          subpath: Watch
     postBuildScripts:
       - name: Generate notification sounds
         basedOnDependencyAnalysis: false
@@ -113,6 +120,35 @@ targets:
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
         PROVISIONING_PROFILE_SPECIFIER: $(QUICK_RELAY_LIVE_PROFILE)
+
+  QuickRelayWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - path: QuickRelayWatch
+        excludes:
+          - Resources
+          - README.md
+      - path: QuakeRelay/Shared/WatchSnapshot.swift
+    resources:
+      - path: QuickRelayWatch/Resources/Assets.xcassets
+      - path: QuickRelayWatch/Resources/PrivacyInfo.xcprivacy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kb-dev.quickrelay.watchkitapp
+        PRODUCT_NAME: QuickRelayWatch
+        SDKROOT: watchos
+        SUPPORTED_PLATFORMS: "watchos watchsimulator"
+        WATCHOS_DEPLOYMENT_TARGET: "10.0"
+        IPHONEOS_DEPLOYMENT_TARGET: ""
+        TARGETED_DEVICE_FAMILY: "4"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_FILE: QuickRelayWatch/Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: ""
+        SKIP_INSTALL: YES
+        PROVISIONING_PROFILE_SPECIFIER: $(QUICK_RELAY_WATCH_PROFILE)
 
   QuakeRelayTests:
     type: bundle.unit-test
@@ -159,3 +195,10 @@ schemes:
           parallelizable: false
         - name: QuakeRelayUITests
           parallelizable: false
+
+  QuickRelayWatch:
+    build:
+      targets:
+        QuickRelayWatch: all
+    run:
+      config: Debug

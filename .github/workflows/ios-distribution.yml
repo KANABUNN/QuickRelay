@@ -23,6 +23,8 @@ jobs:
           test "$(xcrun --sdk iphoneos --show-sdk-version | cut -d. -f1)" -ge 26
       - name: Run simulator tests
         run: sh ios/Scripts/test.sh
+      - name: Build the watchOS companion for simulator
+        run: sh ios/Scripts/test-watch.sh
       - name: Build the Release archive without signing credentials
         run: |
           xcodebuild -quiet -project ios/QuakeRelay.xcodeproj -scheme QuakeRelay \
@@ -36,6 +38,7 @@ jobs:
         run: |
           python3 ios/Scripts/test-distribution.py
           bash -n ios/Scripts/testflight.sh
+          sh -n ios/Scripts/test-watch.sh
           python3 scripts/verify-repository.py
           python3 scripts/audit-secrets.py
           git diff --check

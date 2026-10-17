@@ -1389,7 +1389,8 @@
     },
     "schemas": {
       "Report": {
-        "$ref": "./api.schema.json#/$defs/Report"
+        "$ref": "./api.schema.json#/$defs/Report",
+        "description": "Normalized publication. Optional valid_until is the source bulletin's explicit expiry; absent validity is unknown and is not derived from notification TTL."
       },
       "Event": {
         "$ref": "./api.schema.json#/$defs/Event"

@@ -47,16 +47,18 @@ struct EventListView: View {
     @Query(sort: \EventEntity.latestReportAt, order: .reverse) private var events: [EventEntity]
 
     var body: some View {
-        VStack(spacing: 0) {
-            ReceiverStatusView()
-            if filter.isActive {
-                HStack {
-                    Text("絞り込み結果 \(visibleEvents.count)件").font(.caption)
-                    Spacer()
-                    Button("解除") { filter = HistoryFilter() }.font(.caption)
-                }.padding(.horizontal).padding(.vertical, 5)
+        TimelineView(.periodic(from: .now, by: 15)) { context in
+            VStack(spacing: 0) {
+                ReceiverStatusView()
+                if filter.isActive {
+                    HStack {
+                        Text("絞り込み結果 \(visibleEvents.count)件").font(.caption)
+                        Spacer()
+                        Button("解除") { filter = HistoryFilter() }.font(.caption)
+                    }.padding(.horizontal).padding(.vertical, 5)
+                }
+                listContent(now: context.date)
             }
-            listContent
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
@@ -95,44 +97,73 @@ struct EventListView: View {
         }
     }
 
-    private var listContent: some View {
+    private func listContent(now: Date) -> some View {
         let groups = groupedReports
+        let index = EventContinuationIndex(reports: reports)
+        let ongoing = categoryEvents.filter { index.status(for: $0, now: now).isOngoing }
+            .sorted { $0.latestReportAt > $1.latestReportAt }
         return Group {
-            if visibleEvents.isEmpty {
+            if visibleEvents.isEmpty && ongoing.isEmpty {
                 ContentUnavailableView(
                     filter.isActive ? "条件に合う履歴はありません" : "\(title)の受信履歴はありません",
                     systemImage: "waveform.path.ecg",
                     description: Text(filter.isActive ? "検索語や絞り込み条件を変更してください。" : "下へ引いてサーバーと同期できます。")
                 )
             } else {
-                List(visibleEvents) { event in
-                    NavigationLink(value: AppRoute.event(id: event.id, reportID: nil)) {
-                        EventRow(event: event, unread: history.isUnread(event, scope: scope),
-                                 pinned: history.isPinned(event.id, scope: scope),
-                                 tsunamiReport: TsunamiPublication.latest(in: groups[event.id] ?? [], eventID: event.id))
-                    }
-                    .swipeActions(edge: .leading) {
-                        Button(history.isPinned(event.id, scope: scope) ? "ピンを外す" : "ピン留め", systemImage: "pin") {
-                            history.togglePinned(event.id, scope: scope)
-                        }.tint(.blue)
-                    }
-                    .swipeActions(edge: .trailing) {
-                        Button("既読にする", systemImage: "checkmark") { history.markRead(event, scope: scope) }.tint(.gray)
-                    }
-                    .contextMenu {
-                        Button(history.isPinned(event.id, scope: scope) ? "ピンを外す" : "ピン留め", systemImage: "pin") {
-                            history.togglePinned(event.id, scope: scope)
+                List {
+                    if !ongoing.isEmpty {
+                        Section {
+                            ForEach(ongoing) { event in
+                                eventLink(event, groups: groups, continuation: index.status(for: event, now: now))
+                                    .id("ongoing-" + event.id)
+                            }
+                        } header: {
+                            Text("発表中")
+                        } footer: {
+                            Text("受信した最新発表に基づきます。接続状態と同期時刻も確認してください。")
                         }
-                        Button("既読にする", systemImage: "checkmark") { history.markRead(event, scope: scope) }
+                        .accessibilityIdentifier("ongoingEvents")
                     }
+                    Section("履歴") {
+                        if visibleEvents.isEmpty {
+                            Text("条件に合う履歴はありません").foregroundStyle(.secondary)
+                        }
+                        ForEach(visibleEvents) { event in
+                            eventLink(event, groups: groups, continuation: index.status(for: event, now: now))
+                                .id("history-" + event.id)
+                        }
+                    }
+                    .accessibilityIdentifier("eventHistory")
                 }
                 .listStyle(.plain)
             }
         }
-        .refreshable {
-            _ = await repository.syncAll()
+        .refreshable { _ = await repository.syncAll() }
+    }
+
+    private func eventLink(_ event: EventEntity, groups: [String: [ReportEntity]], continuation: EventContinuation) -> some View {
+        NavigationLink(value: AppRoute.event(id: event.id, reportID: nil)) {
+            EventRow(event: event, unread: history.isUnread(event, scope: scope),
+                     pinned: history.isPinned(event.id, scope: scope),
+                     tsunamiReport: TsunamiPublication.latest(in: groups[event.id] ?? [], eventID: event.id),
+                     continuation: continuation)
+        }
+        .swipeActions(edge: .leading) {
+            Button(history.isPinned(event.id, scope: scope) ? "ピンを外す" : "ピン留め", systemImage: "pin") {
+                history.togglePinned(event.id, scope: scope)
+            }.tint(.blue)
+        }
+        .swipeActions(edge: .trailing) {
+            Button("既読にする", systemImage: "checkmark") { history.markRead(event, scope: scope) }.tint(.gray)
+        }
+        .contextMenu {
+            Button(history.isPinned(event.id, scope: scope) ? "ピンを外す" : "ピン留め", systemImage: "pin") {
+                history.togglePinned(event.id, scope: scope)
+            }
+            Button("既読にする", systemImage: "checkmark") { history.markRead(event, scope: scope) }
         }
     }
+
 }
 
 private struct EventRow: View {
@@ -140,6 +171,7 @@ private struct EventRow: View {
     var unread = false
     var pinned = false
     var tsunamiReport: ReportEntity?
+    var continuation = EventContinuation.history
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -155,6 +187,15 @@ private struct EventRow: View {
                 Text(event.latestReportAt, format: .dateTime.month().day().hour().minute())
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
+            }
+
+            if continuation.isOngoing {
+                Label("継続中", systemImage: "dot.radiowaves.left.and.right")
+                    .font(.caption.bold()).foregroundStyle(.orange)
+                    .accessibilityIdentifier("ongoing-" + event.id)
+                Text(continuation.explanation).font(.caption).foregroundStyle(.secondary)
+            } else if continuation.state == .unknown {
+                Text("継続状況未確認").font(.caption.bold()).foregroundStyle(.orange)
             }
 
             HStack(spacing: 10) {

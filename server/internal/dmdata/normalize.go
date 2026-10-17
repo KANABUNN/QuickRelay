@@ -51,6 +51,7 @@ type converted struct {
 		Version string `json:"version"`
 	} `json:"_schema"`
 	PressedAt  *time.Time      `json:"pressDateTime"`
+	ValidUntil *time.Time      `json:"validDateTime"`
 	EventID    string          `json:"eventId"`
 	Serial     json.RawMessage `json:"serialNo"`
 	Status     string          `json:"status"`
@@ -235,6 +236,9 @@ func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time
 	if c.ReportedAt.After(now.Add(30 * time.Second)) {
 		return r, errors.New("telegram time is in the future; check clock")
 	}
+	if c.ValidUntil != nil && c.ValidUntil.IsZero() {
+		return r, errors.New("invalid telegram expiry time")
+	}
 	switch c.InfoType {
 	case "発表", "訂正", "遅延", "取消":
 	default:
@@ -264,6 +268,10 @@ func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time
 	r.InfoType = c.InfoType
 	r.AffectedAreas = affectedAreas(body, e.Head.Type)
 	r.PressedAt = c.PressedAt
+	if c.ValidUntil != nil {
+		valid := c.ValidUntil.UTC()
+		r.ValidUntil = &valid
+	}
 	r.MessageID = e.ID
 	r.Classification = expected
 	r.TelegramType = e.Head.Type

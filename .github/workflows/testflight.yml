@@ -28,6 +28,8 @@ jobs:
           python3 scripts/verify-repository.py
           python3 scripts/audit-secrets.py
           git diff --check
+      - name: Build the watchOS companion before accessing signing credentials
+        run: sh ios/Scripts/test-watch.sh
       - name: Allocate a build number above earlier repository releases
         run: |
           python3 - <<'PY'
@@ -46,6 +48,7 @@ jobs:
           IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
           IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
           IOS_LIVE_ACTIVITY_PROFILE_BASE64: ${{ secrets.IOS_LIVE_ACTIVITY_PROFILE_BASE64 }}
+          IOS_WATCH_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_WATCH_PROVISION_PROFILE_BASE64 }}
           ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
