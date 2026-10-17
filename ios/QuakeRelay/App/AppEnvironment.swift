@@ -40,6 +40,7 @@ enum PairingServerBinding {
 @MainActor
 final class AppEnvironment: ObservableObject {
     let historyPreferences = HistoryPreferences()
+    let watch = PhoneWatchCoordinator()
     @Published private(set) var isPaired = false
     @Published private(set) var pairingError: String?
     @Published private(set) var startupError: String?
@@ -109,6 +110,24 @@ final class AppEnvironment: ObservableObject {
         self.liveActivities = LiveActivityCoordinator(api: resolvedAPI)
         self.startupError = containerError
 
+        watch.makeSnapshot = { [weak self] in
+            guard let self else { return nil }
+            let now = Date()
+            let receiver = ReceiverState.resolve(status: self.receiverStatus, checkedAt: self.receiverStatusCheckedAt,
+                failed: self.receiverStatusError != nil, now: now)
+            // Never send a previous server's local history while switching origin.
+            let bound = self.repository.serverIdentity == (try? self.api.serverIdentity())
+            return try? WatchSnapshotBuilder.make(context: self.modelContainer.mainContext,
+                paired: self.isPaired && bound, lastSyncAt: self.repository.lastSyncAt,
+                receiverSummary: receiver.label, now: now)
+        }
+        watch.onSyncRequested = { [weak self] in
+            guard let self, self.isPaired else { return }
+            _ = await self.repository.syncAll()
+            await self.refreshReceiverStatus()
+        }
+        resolvedRepository.onSyncFinished = { [weak self] in self?.watch.publish() }
+
         resolvedNotifications.onSyncRequested = { [weak resolvedRepository] in
             Task { @MainActor in
                 _ = await resolvedRepository?.syncAll()
@@ -126,6 +145,8 @@ final class AppEnvironment: ObservableObject {
             startupError = error.localizedDescription
         }
 
+        watch.start()
+        watch.publish()
         // Resolve existing settings and the one-time category expansion before APNs registration.
         if isPaired { await refreshRemotePreferences() }
         await notifications.configureAndRegisterForRemoteNotifications()
@@ -188,6 +209,7 @@ final class AppEnvironment: ObservableObject {
             }
             try credentials.clearAccessToken()
             isPaired = false
+            watch.publish()
             receiverStatus = nil; receiverStatusCheckedAt = nil; receiverStatusError = nil
             notificationTestResult = nil; notificationTestError = nil; notificationTestAvailableAt = nil
             testRequestID = nil
@@ -225,6 +247,7 @@ final class AppEnvironment: ObservableObject {
 
     func refreshReceiverStatus() async {
         guard isPaired else { return }
+        defer { watch.publish() }
         do {
             receiverStatus = try await api.receiverStatus()
             receiverStatusCheckedAt = Date()

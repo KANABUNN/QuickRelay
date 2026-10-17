@@ -17,6 +17,7 @@ struct QuakeRelayApp: App {
                 .environmentObject(environment.notifications)
                 .environmentObject(environment.deviceRegistration)
                 .environmentObject(environment.liveActivities)
+                .environmentObject(environment.watch)
                 .task {
                     // Bind before start() requests APNs registration, so its
                     // callback cannot race the delegate/environment wiring.

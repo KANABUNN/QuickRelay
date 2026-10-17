@@ -1,5 +1,5 @@
 #!/bin/bash
-# A temporary keychain and a manually issued profile sign only this app.
+# A temporary keychain and dedicated profiles sign the app and its embedded targets.
 set -euo pipefail
 umask 077
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -10,6 +10,7 @@ bundle=jp.kb-dev.quickrelay
 : "${IOS_DISTRIBUTION_P12_PASSWORD:?}"
 : "${IOS_PROVISION_PROFILE_BASE64:?}"
 : "${IOS_LIVE_ACTIVITY_PROFILE_BASE64:?Issue the dedicated WidgetKit extension App Store profile before uploading}"
+: "${IOS_WATCH_PROVISION_PROFILE_BASE64:?Issue the dedicated Watch app App Store profile before uploading}"
 : "${ASC_PRIVATE_KEY_BASE64:?}"
 : "${ASC_KEY_ID:?}"
 : "${ASC_ISSUER_ID:?}"
@@ -24,12 +25,16 @@ profile_path=
 profile_path_legacy=
 live_profile_path=
 live_profile_path_legacy=
+watch_profile_path=
+watch_profile_path_legacy=
 cleanup() {
   security delete-keychain "$keychain" >/dev/null 2>&1 || true
   if [ -n "$profile_path" ]; then rm -f "$profile_path"; fi
   if [ -n "$profile_path_legacy" ]; then rm -f "$profile_path_legacy"; fi
   if [ -n "$live_profile_path" ]; then rm -f "$live_profile_path"; fi
   if [ -n "$live_profile_path_legacy" ]; then rm -f "$live_profile_path_legacy"; fi
+  if [ -n "$watch_profile_path" ]; then rm -f "$watch_profile_path"; fi
+  if [ -n "$watch_profile_path_legacy" ]; then rm -f "$watch_profile_path_legacy"; fi
   case "$signing" in "$RUNNER_TEMP"/quick-relay-signing.*) rm -rf "$signing" ;; esac
 }
 trap cleanup EXIT
@@ -40,13 +45,14 @@ from pathlib import Path
 p = Path(os.environ['QR_SIGNING_DIR'])
 for variable, name in [('IOS_DISTRIBUTION_P12_BASE64', 'certificate.p12'),
                        ('IOS_PROVISION_PROFILE_BASE64', 'profile.mobileprovision'),
-                       ('IOS_LIVE_ACTIVITY_PROFILE_BASE64', 'live-profile.mobileprovision')]:
+                       ('IOS_LIVE_ACTIVITY_PROFILE_BASE64', 'live-profile.mobileprovision'),
+                       ('IOS_WATCH_PROVISION_PROFILE_BASE64', 'watch-profile.mobileprovision')]:
     (p / name).write_bytes(base64.b64decode(os.environ[variable], validate=True))
 (p / 'private_keys').mkdir(mode=0o700)
 (p / 'private_keys' / ('AuthKey_' + os.environ['ASC_KEY_ID'] + '.p8')).write_bytes(
     base64.b64decode(os.environ['ASC_PRIVATE_KEY_BASE64'], validate=True))
 PY
-unset IOS_DISTRIBUTION_P12_BASE64 IOS_PROVISION_PROFILE_BASE64 IOS_LIVE_ACTIVITY_PROFILE_BASE64 ASC_PRIVATE_KEY_BASE64
+unset IOS_DISTRIBUTION_P12_BASE64 IOS_PROVISION_PROFILE_BASE64 IOS_LIVE_ACTIVITY_PROFILE_BASE64 IOS_WATCH_PROVISION_PROFILE_BASE64 ASC_PRIVATE_KEY_BASE64
 security cms -D -i "$signing/profile.mobileprovision" > "$signing/profile.plist"
 python3 "$repo/ios/Scripts/validate-distribution.py" profile "$signing/profile.plist" \
   --team "$APPLE_TEAM_ID" --bundle "$bundle" --metadata "$signing/profile.json"
@@ -55,11 +61,18 @@ python3 "$repo/ios/Scripts/validate-distribution.py" profile "$signing/live-prof
   --team "$APPLE_TEAM_ID" --bundle "$bundle.LiveActivity" --extension --metadata "$signing/live-profile.json"
 live_profile_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["uuid"])' "$signing/live-profile.json")
 [[ "$live_profile_uuid" =~ ^[A-Fa-f0-9-]{36}$ ]]
-python3 - "$signing/profile.json" "$signing/live-profile.json" <<'PY'
+security cms -D -i "$signing/watch-profile.mobileprovision" > "$signing/watch-profile.plist"
+python3 "$repo/ios/Scripts/validate-distribution.py" profile "$signing/watch-profile.plist" \
+  --team "$APPLE_TEAM_ID" --bundle "$bundle.watchkitapp" --watch --metadata "$signing/watch-profile.json"
+watch_profile_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["uuid"])' "$signing/watch-profile.json")
+[[ "$watch_profile_uuid" =~ ^[A-Fa-f0-9-]{36}$ ]]
+python3 - "$signing/profile.json" "$signing/live-profile.json" "$signing/watch-profile.json" <<'PY'
 import json,sys
-app,extension = (json.load(open(p)) for p in sys.argv[1:])
-if app['certificate_sha1'] != extension['certificate_sha1']:
-    raise SystemExit('App and extension must use the same distribution certificate.')
+profiles = [json.load(open(p)) for p in sys.argv[1:]]
+if len({profile['certificate_sha1'] for profile in profiles}) != 1:
+    raise SystemExit('App, extension and Watch app must use the same distribution certificate.')
+if len({profile['uuid'] for profile in profiles}) != len(profiles):
+    raise SystemExit('Each embedded target requires a separate distribution profile.')
 PY
 profile_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["uuid"])' "$signing/profile.json")
 identity=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["certificate_sha1"])' "$signing/profile.json")
@@ -84,6 +97,7 @@ for folder in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$H
   mkdir -p "$folder"
   test ! -e "$folder/$profile_uuid.mobileprovision"
   test ! -e "$folder/$live_profile_uuid.mobileprovision"
+  test ! -e "$folder/$watch_profile_uuid.mobileprovision"
 done
 profile_path="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$profile_uuid.mobileprovision"
 profile_path_legacy="$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
@@ -93,6 +107,10 @@ live_profile_path="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/
 live_profile_path_legacy="$HOME/Library/MobileDevice/Provisioning Profiles/$live_profile_uuid.mobileprovision"
 cp "$signing/live-profile.mobileprovision" "$live_profile_path"
 cp "$signing/live-profile.mobileprovision" "$live_profile_path_legacy"
+watch_profile_path="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$watch_profile_uuid.mobileprovision"
+watch_profile_path_legacy="$HOME/Library/MobileDevice/Provisioning Profiles/$watch_profile_uuid.mobileprovision"
+cp "$signing/watch-profile.mobileprovision" "$watch_profile_path"
+cp "$signing/watch-profile.mobileprovision" "$watch_profile_path_legacy"
 output="$repo/.tmp/testflight"
 mkdir -p "$output"
 xcodebuild -quiet -project "$repo/ios/QuakeRelay.xcodeproj" -scheme QuakeRelay \
@@ -100,23 +118,27 @@ xcodebuild -quiet -project "$repo/ios/QuakeRelay.xcodeproj" -scheme QuakeRelay \
   -archivePath "$output/QuakeRelay.xcarchive" \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="$identity" QUICK_RELAY_APP_PROFILE="$profile_uuid" QUICK_RELAY_LIVE_PROFILE="$live_profile_uuid" \
+  QUICK_RELAY_WATCH_PROFILE="$watch_profile_uuid" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" archive
 app="$output/QuakeRelay.xcarchive/Products/Applications/QuakeRelay.app"
 codesign --verify --deep --strict "$app"
 codesign -d --entitlements :- "$app" > "$signing/signed-entitlements.plist" 2>/dev/null
 codesign -d --entitlements :- "$app/PlugIns/QuickRelayLiveActivity.appex" > "$signing/extension-entitlements.plist" 2>/dev/null
+codesign -d --entitlements :- "$app/Watch/QuickRelayWatch.app" > "$signing/watch-entitlements.plist" 2>/dev/null
 python3 "$repo/ios/Scripts/validate-distribution.py" bundle "$app" --bundle "$bundle" \
   --build "$BUILD_NUMBER" --team "$APPLE_TEAM_ID" --entitlements "$signing/signed-entitlements.plist" \
   --extension-entitlements "$signing/extension-entitlements.plist" \
+  --watch-entitlements "$signing/watch-entitlements.plist" \
   > "$output/validation.json"
-export QR_PROFILE_UUID="$profile_uuid" QR_LIVE_PROFILE_UUID="$live_profile_uuid" QR_SIGNING_IDENTITY="$identity"
+export QR_PROFILE_UUID="$profile_uuid" QR_LIVE_PROFILE_UUID="$live_profile_uuid" QR_WATCH_PROFILE_UUID="$watch_profile_uuid" QR_SIGNING_IDENTITY="$identity"
 python3 - <<'PY'
 import os, plistlib
 from pathlib import Path
 data = {'method': 'app-store-connect', 'destination': 'export', 'signingStyle': 'manual',
         'teamID': os.environ['APPLE_TEAM_ID'], 'signingCertificate': os.environ['QR_SIGNING_IDENTITY'],
         'provisioningProfiles': {'jp.kb-dev.quickrelay': os.environ['QR_PROFILE_UUID'],
-                                 'jp.kb-dev.quickrelay.LiveActivity': os.environ['QR_LIVE_PROFILE_UUID']},
+                                 'jp.kb-dev.quickrelay.LiveActivity': os.environ['QR_LIVE_PROFILE_UUID'],
+                                 'jp.kb-dev.quickrelay.watchkitapp': os.environ['QR_WATCH_PROFILE_UUID']},
         'manageAppVersionAndBuildNumber': False, 'uploadSymbols': True,
         'testFlightInternalTestingOnly': True}
 (Path(os.environ['QR_SIGNING_DIR']) / 'ExportOptions.plist').write_bytes(plistlib.dumps(data))

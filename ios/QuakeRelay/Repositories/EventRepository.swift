@@ -179,6 +179,7 @@ final class EventRepository: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var serverIdentity = ""
 
+    var onSyncFinished: (() -> Void)?
     private let context: ModelContext
     private let api: APIClient
 
@@ -213,7 +214,7 @@ final class EventRepository: ObservableObject {
         guard !isSyncing else { return false }
         isSyncing = true
         lastError = nil
-        defer { isSyncing = false }
+        defer { isSyncing = false; onSyncFinished?() }
 
         do {
             try SyncPageApplier.bindServer(try api.serverIdentity(), in: context)

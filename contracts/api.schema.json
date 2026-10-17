@@ -148,6 +148,11 @@
           "type": "string",
           "format": "date-time"
         },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Source bulletin expiry (JMA Head/ValidDateTime or converted validDateTime), only when explicitly supplied. Absence means unknown; notification TTL does not determine bulletin validity."
+        },
         "bulletin": {
           "$ref": "#/$defs/Bulletin"
         },

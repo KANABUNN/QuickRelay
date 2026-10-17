@@ -61,6 +61,7 @@ type Report struct {
 	SourceEventID  string          `json:"source_event_id,omitempty"`
 	InfoType       string          `json:"info_type,omitempty"`
 	PressedAt      *time.Time      `json:"press_time,omitempty"`
+	ValidUntil     *time.Time      `json:"valid_until,omitempty"`
 	Bulletin       *Bulletin       `json:"bulletin,omitempty"`
 	AffectedAreas  []AffectedArea  `json:"affected_areas,omitempty"`
 	Raw            json.RawMessage `json:"-"`

@@ -16,6 +16,7 @@ struct EventDetailView: View {
     @EnvironmentObject private var repository: EventRepository
     @Query private var events: [EventEntity]
     @Query private var reports: [ReportEntity]
+    @Query private var allReports: [ReportEntity]
 
     init(eventID: String, highlightedReportID: String?) {
         self.eventID = eventID
@@ -31,31 +32,33 @@ struct EventDetailView: View {
     }
 
     var body: some View {
-        Group {
-            if let event = events.first {
-                ScrollViewReader { proxy in
-                    List {
-                        latestSection(event)
-                        if let latestReport {
-                            ReportChangesView(report: latestReport, previous: ReportComparison.previous(to: latestReport, in: reports))
+        TimelineView(.periodic(from: .now, by: 15)) { context in
+            Group {
+                if let event = events.first {
+                    ScrollViewReader { proxy in
+                        List {
+                            latestSection(event, now: context.date)
+                            if let latestReport {
+                                ReportChangesView(report: latestReport, previous: ReportComparison.previous(to: latestReport, in: reports))
+                            }
+                            if event.isWarningProduct && !event.isCancelled { forecastReferenceSection }
+                            if let latestReport, let bulletin = latestReport.bulletin {
+                                Section("発表内容") { BulletinContent(bulletin: bulletin, reportID: latestReport.id) }
+                            }
+                            timelineSection(now: context.date)
                         }
-                        if event.isWarningProduct && !event.isCancelled { forecastReferenceSection }
-                        if let latestReport, let bulletin = latestReport.bulletin {
-                            Section("発表内容") { BulletinContent(bulletin: bulletin, reportID: latestReport.id) }
+                        .onAppear { scrollToHighlightedReport(using: proxy) }
+                        .onChange(of: reports.count) { _, _ in
+                            scrollToHighlightedReport(using: proxy)
                         }
-                        timelineSection
                     }
-                    .onAppear { scrollToHighlightedReport(using: proxy) }
-                    .onChange(of: reports.count) { _, _ in
-                        scrollToHighlightedReport(using: proxy)
-                    }
+                } else {
+                    ContentUnavailableView(
+                        "情報を読み込めません",
+                        systemImage: "exclamationmark.icloud",
+                        description: Text("同期後も見つからない場合は、対象の情報がサーバーに残っているか確認してください。")
+                    )
                 }
-            } else {
-                ContentUnavailableView(
-                    "情報を読み込めません",
-                    systemImage: "exclamationmark.icloud",
-                    description: Text("同期後も見つからない場合は、対象の情報がサーバーに残っているか確認してください。")
-                )
             }
         }
         .navigationTitle(events.first?.displayTitle ?? "情報の詳細")
@@ -91,8 +94,20 @@ struct EventDetailView: View {
     }
 
     @ViewBuilder
-    private func latestSection(_ event: EventEntity) -> some View {
+    private func latestSection(_ event: EventEntity, now: Date) -> some View {
+        let continuation = EventContinuationIndex(reports: allReports).status(for: event, now: now)
         Section("最新状態") {
+            if continuation.isOngoing {
+                Label("継続中", systemImage: "dot.radiowaves.left.and.right")
+                    .font(.headline).foregroundStyle(.orange)
+                    .accessibilityIdentifier("detailOngoing")
+                Text(continuation.explanation).font(.caption).foregroundStyle(.secondary)
+            } else if continuation.state == .unknown {
+                Label("継続状況未確認", systemImage: "exclamationmark.circle").foregroundStyle(.orange)
+                Text(continuation.explanation).font(.caption)
+            } else if continuation.state == .ended {
+                Text(continuation.explanation).font(.caption).foregroundStyle(.secondary)
+            }
             LabeledContent("種別", value: RelayEventType(rawValue: event.eventType)?.displayName ?? event.eventType)
             LabeledContent("発表時刻", value: event.latestReportAt.formatted(date: .abbreviated, time: .standard))
             if event.category == "tsunami", let report = TsunamiPublication.latest(in: reports, eventID: eventID),
@@ -150,8 +165,9 @@ struct EventDetailView: View {
         }
     }
 
-    private var timelineSection: some View {
-        Section("発表履歴") {
+    private func timelineSection(now: Date) -> some View {
+        let continuation = events.first.map { EventContinuationIndex(reports: allReports).status(for: $0, now: now) }
+        return Section("発表履歴") {
             if reports.isEmpty {
                 Text("発表履歴はまだ同期されていません。")
                     .foregroundStyle(.secondary)
@@ -159,7 +175,8 @@ struct EventDetailView: View {
                 ForEach(sortedReports) { report in
                     ReportTimelineRow(
                         report: report,
-                        highlighted: report.id == highlightedReportID
+                        highlighted: report.id == highlightedReportID,
+                        ongoing: continuation?.reportIDs.contains(report.id) == true
                     )
                     .id(report.id)
                 }
@@ -192,11 +209,13 @@ struct EventDetailView: View {
 private struct ReportTimelineRow: View {
     let report: ReportEntity
     let highlighted: Bool
+    var ongoing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(report.publicationLabel).font(.headline)
+                if ongoing { StatusBadge(text: "継続中", color: .orange) }
                 Spacer()
                 Text(report.receivedAt, format: .dateTime.hour().minute().second())
                     .font(.caption.monospacedDigit())

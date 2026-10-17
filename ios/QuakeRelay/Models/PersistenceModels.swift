@@ -110,6 +110,7 @@ final class ReportEntity {
     var infoType: String? = nil
     var bulletinData: Data? = nil
     var pressTime: Date? = nil
+    var validUntil: Date? = nil
 
     init(dto: ReportDTO, serverSequence: Int64) {
         id = dto.id
@@ -133,6 +134,7 @@ final class ReportEntity {
         infoType = dto.infoType
         bulletinData = dto.bulletin.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
         pressTime = ServerDateParser.parse(dto.pressTime)
+        validUntil = ServerDateParser.parse(dto.validUntil)
     }
 
     func update(from dto: ReportDTO, serverSequence: Int64) {
@@ -156,6 +158,7 @@ final class ReportEntity {
         infoType = dto.infoType
         bulletinData = dto.bulletin.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
         pressTime = ServerDateParser.parse(dto.pressTime)
+        validUntil = ServerDateParser.parse(dto.validUntil)
     }
 
     var isEEW: Bool { RelayEventType(rawValue: eventType)?.isEEW == true }

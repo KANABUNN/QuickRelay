@@ -16,14 +16,17 @@ def load(path):
     return plistlib.loads(Path(path).read_bytes())
 
 
-def validate_profile(profile, team, bundle, extension=False):
+def validate_profile(profile, team, bundle, extension=False, watch=False):
+    require(not (extension and watch), "Profile target roles are mutually exclusive")
     entitlement = profile["Entitlements"]
     require(profile["TeamIdentifier"] == [team], "Profile team differs")
     require(entitlement["application-identifier"] == f"{team}.{bundle}", "Profile App ID differs")
-    if not extension:
+    if not extension and not watch:
         require(entitlement["aps-environment"] == "production", "Production push missing from profile")
         require(entitlement.get("com.apple.developer.usernotifications.time-sensitive") is True,
                 "Time Sensitive Notifications missing from profile")
+    if watch and "aps-environment" in entitlement:
+        require(entitlement["aps-environment"] == "production", "Watch push environment differs")
     require(entitlement.get("get-task-allow") is False, "Development profile cannot be distributed")
     require(entitlement.get("beta-reports-active") is True, "App Store profile required")
     require(not profile.get("ProvisionedDevices") and not profile.get("ProvisionsAllDevices"),
@@ -33,7 +36,11 @@ def validate_profile(profile, team, bundle, extension=False):
     require(len(profile["DeveloperCertificates"]) == 1, "Expected one signing certificate")
 
 
-def validate_bundle(bundle, identifier, build, signed_entitlements=None, team=None, extension_entitlements=None):
+def validate_bundle(bundle, identifier, build, signed_entitlements=None, team=None, extension_entitlements=None,
+                    watch_entitlements=None):
+    if signed_entitlements is not None:
+        require(team and extension_entitlements is not None and watch_entitlements is not None,
+                "Signed archive requires team, extension and Watch entitlements")
     app = Path(bundle)
     info = load(app / "Info.plist")
     require(info["CFBundleIdentifier"] == identifier, "Built bundle ID differs")
@@ -45,6 +52,8 @@ def validate_bundle(bundle, identifier, build, signed_entitlements=None, team=No
     require(info.get("NSSupportsLiveActivities") is True, "Live Activities support missing")
     extension = app / "PlugIns" / "QuickRelayLiveActivity.appex"
     validate_extension(extension, identifier + ".LiveActivity", build, info["CFBundleShortVersionString"], extension_entitlements, team)
+    validate_watch(app / "Watch" / "QuickRelayWatch.app", identifier + ".watchkitapp", identifier,
+                   build, info["CFBundleShortVersionString"], watch_entitlements, team)
     privacy = load(app / "PrivacyInfo.xcprivacy")
     require(privacy["NSPrivacyTracking"] is False, "Unexpected tracking declaration")
     for sound in ("quake_warning.caf", "quake_update.caf", "normal.caf"):
@@ -58,7 +67,8 @@ def validate_bundle(bundle, identifier, build, signed_entitlements=None, team=No
                 "Signed Time Sensitive entitlement missing")
     print(json.dumps({"bundle_id": identifier, "version": info["CFBundleShortVersionString"],
                       "build": build, "apns": "production", "privacy_manifest": True,
-                      "notification_sounds": True, "live_activity_extension": True}, sort_keys=True))
+                      "notification_sounds": True, "live_activity_extension": True,
+                      "watch_app": True}, sort_keys=True))
 
 
 def validate_extension(path, identifier, build, version, signed_entitlements=None, team=None):
@@ -75,6 +85,28 @@ def validate_extension(path, identifier, build, version, signed_entitlements=Non
         require(entitlement["application-identifier"] == f"{team}.{identifier}", "Signed extension App ID differs")
         require(entitlement.get("get-task-allow", False) is False, "Extension debug signing enabled")
 
+
+def validate_watch(path, identifier, companion, build, version, signed_entitlements=None, team=None):
+    watch = Path(path)
+    info = load(watch / "Info.plist")
+    require(info["CFBundleIdentifier"] == identifier, "Watch App ID differs")
+    require(info["CFBundleVersion"] == build and info["CFBundleShortVersionString"] == version,
+            "Watch version differs")
+    require(info.get("WKApplication") is True, "Single-target watchOS application missing")
+    require(info.get("WKCompanionAppBundleIdentifier") == companion, "Watch companion App ID differs")
+    require(info.get("WKRunsIndependentlyOfCompanionApp") is False,
+            "Watch app requires its iPhone companion")
+    require(info.get("ITSAppUsesNonExemptEncryption") is False, "Watch encryption declaration missing")
+    privacy = load(watch / "PrivacyInfo.xcprivacy")
+    require(privacy["NSPrivacyTracking"] is False, "Unexpected watch tracking")
+    if signed_entitlements is not None:
+        entitlement = load(signed_entitlements)
+        require(entitlement["application-identifier"] == f"{team}.{identifier}", "Signed Watch App ID differs")
+        require(entitlement.get("get-task-allow", False) is False, "Watch debug signing enabled")
+        if "aps-environment" in entitlement:
+            require(entitlement["aps-environment"] == "production", "Signed watch push environment differs")
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -83,7 +115,9 @@ def main():
     profile.add_argument("--team", required=True)
     profile.add_argument("--bundle", required=True)
     profile.add_argument("--metadata", required=True)
-    profile.add_argument("--extension", action="store_true")
+    role = profile.add_mutually_exclusive_group()
+    role.add_argument("--extension", action="store_true")
+    role.add_argument("--watch", action="store_true")
     app = sub.add_parser("bundle")
     app.add_argument("path")
     app.add_argument("--bundle", required=True)
@@ -91,16 +125,18 @@ def main():
     app.add_argument("--entitlements")
     app.add_argument("--team")
     app.add_argument("--extension-entitlements")
+    app.add_argument("--watch-entitlements")
     args = parser.parse_args()
     if args.command == "profile":
         data = load(args.path)
-        validate_profile(data, args.team, args.bundle, args.extension)
+        validate_profile(data, args.team, args.bundle, args.extension, args.watch)
         metadata = {"uuid": data["UUID"], "name": data["Name"],
                     "certificate_sha1": hashlib.sha1(data["DeveloperCertificates"][0]).hexdigest().upper()}
         Path(args.metadata).write_text(json.dumps(metadata), encoding="utf-8")
-        print("PASS: distribution profile, team, App ID, expiry, production push and Time Sensitive")
+        print("PASS: distribution profile, target role, team, App ID, expiry and required entitlements")
     else:
-        validate_bundle(args.path, args.bundle, args.build, args.entitlements, args.team, args.extension_entitlements)
+        validate_bundle(args.path, args.bundle, args.build, args.entitlements, args.team,
+                        args.extension_entitlements, args.watch_entitlements)
 
 
 if __name__ == "__main__":

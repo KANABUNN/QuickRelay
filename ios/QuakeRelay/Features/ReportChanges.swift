@@ -14,10 +14,13 @@ struct TsunamiPublication {
         let kind: String
         let previousKind: String?
         let height: String?
-        var warning: Bool { ["大津波警報", "津波警報", "津波注意報"].contains(kind) }
+        var warning: Bool { Self.warningKind(kind) }
+        private static func warningKind(_ kind: String) -> Bool {
+            ["大津波警報", "大津波警報：発表", "津波警報", "津波注意報"].contains(kind)
+        }
         var withdrawn: Bool {
             kind.contains("解除") || (kind.contains("津波予報") &&
-                previousKind.map { ["大津波警報", "津波警報", "津波注意報"].contains($0) } == true)
+                previousKind.map { Self.warningKind($0) } == true)
         }
     }
     let report: ReportEntity

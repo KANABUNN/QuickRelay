@@ -15,6 +15,11 @@ It does not submit an App Store version or create a public invitation link.
    using the same Apple Distribution certificate. This WidgetKit extension does
    not need the application's Push/Time Sensitive entitlements. The archive embeds
    the extension, and signing/export use separate exact App IDs and profiles.
+   Issue a third App Store profile for `jp.kb-dev.quickrelay.watchkitapp`, using
+   the same distribution certificate. The single-target Watch companion does not
+   require Push or Time Sensitive entitlements; it receives display data from the
+   iPhone through WatchConnectivity. Its exact App ID, App Store distribution
+   flags, expiry, certificate, companion ID and version are validated separately.
 2. Configure a `testflight` GitHub environment. Permit only the reviewed release
    tag(s). Keep signing inputs in this environment rather than repository-wide
    secrets. Require the owner to approve this environment; allow self-review for a single-owner project.
@@ -27,6 +32,7 @@ It does not submit an App Store version or create a public invitation link.
    | `IOS_DISTRIBUTION_P12_PASSWORD` | P12 password |
    | `IOS_PROVISION_PROFILE_BASE64` | Base64 of application distribution mobileprovision |
    | `IOS_LIVE_ACTIVITY_PROFILE_BASE64` | Base64 of the dedicated WidgetKit extension distribution mobileprovision |
+   | `IOS_WATCH_PROVISION_PROFILE_BASE64` | Base64 of the dedicated Watch app distribution mobileprovision |
    | `ASC_PRIVATE_KEY_BASE64` | Base64 of App Store Connect API private key |
    | `ASC_KEY_ID` | API key identifier |
    | `ASC_ISSUER_ID` | API issuer identifier |
@@ -37,8 +43,10 @@ It does not submit an App Store version or create a public invitation link.
 
 4. Open a PR and wait for `iOS distribution readiness` to pass with Xcode/iOS SDK
    26 or newer. It runs simulator tests and a Release archive without secrets,
-   then verifies compiled icons, the privacy manifest, notification sounds and
-   the production APNs configuration.
+   compiles the watchOS simulator target, then verifies compiled icons, privacy
+   manifests, notification sounds, production APNs configuration and the embedded
+   `Watch/QuickRelayWatch.app` identity, companion ID and matching versions.
+   The signed upload additionally requires all three provisioning profiles.
 
 ## Upload and accept
 
@@ -62,6 +70,11 @@ It does not submit an App Store version or create a public invitation link.
 6. Install using TestFlight, allow notifications, pair using the deployed API
    URL and a fresh pairing code, and confirm real delivery. Simulator acceptance
    and a successful signed upload do not replace this final iPhone check.
+7. Install the companion on the paired Apple Watch. Open both apps and confirm
+   transfer, refresh, the earthquake and tsunami lists, details, and expiry of
+   ongoing labels. Also check the cached display while the iPhone is unreachable.
+   A generic watchOS simulator build verifies compilation; it does not verify
+   paired-device WatchConnectivity delivery or TestFlight installation on a Watch.
 
 ## Application declarations
 
@@ -75,4 +88,5 @@ Review these declarations whenever networking, analytics, storage or SDKs change
 
 References: [Apple profile creation](https://developer.apple.com/help/account/provisioning-profiles/create-an-app-store-provisioning-profile),
 [build uploads](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/),
+[watchOS companion setup](https://developer.apple.com/documentation/watchos-apps/setting-up-a-watchos-project),
 [GitHub signing guidance](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications).

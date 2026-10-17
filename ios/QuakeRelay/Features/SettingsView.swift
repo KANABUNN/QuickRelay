@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct SettingsView: View {
+    @EnvironmentObject private var watch: PhoneWatchCoordinator
     @EnvironmentObject private var environment: AppEnvironment
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var repository: EventRepository
@@ -125,6 +126,16 @@ struct SettingsView: View {
                         UIApplication.shared.open(url)
                     }
                 }
+            }
+
+            Section("Apple Watch") {
+                LabeledContent("Watchへ送信", value: watch.lastSentAt?.formatted(date: .abbreviated, time: .shortened) ?? "未送信")
+                Button("Watchの表示情報を更新") {
+                    Task { _ = await repository.syncAll(); watch.publish() }
+                }
+                if let error = watch.lastError { Text(error).font(.caption).foregroundStyle(.orange) }
+                Text("ペアリングしたApple Watchで、地震・津波の発表中情報と最近の履歴を確認できます。iPhoneで受信・同期した情報を送信します。")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("同期") {
