@@ -1,4 +1,4 @@
-// Package dmdata consumes the official API v2 JSON conversion format.
+// Package dmdata consumes DMDATA v2 raw JMA telegrams and converted JSON.
 package dmdata
 
 import (
@@ -104,6 +104,12 @@ func limited(r io.Reader) ([]byte, error) {
 	return b, nil
 }
 func DecodeBody(e Envelope) ([]byte, error) {
+	if len(e.Body) > MaxMessageBytes {
+		return nil, errors.New("encoded telegram too large")
+	}
+	if e.Compression != "" && e.Encoding != "base64" {
+		return nil, errors.New("compressed telegram must be base64")
+	}
 	b := []byte(e.Body)
 	switch e.Encoding {
 	case "base64":
@@ -180,12 +186,22 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 	if !supported {
 		return r, ErrIgnored
 	}
-	expected := p.classification
-	if e.Type != "data" || e.Head.Test || e.Classification != expected {
+	if e.Type != "data" || e.Head.Test || e.Classification != p.classification {
 		return r, ErrIgnored
 	}
 	body, err := DecodeBody(e)
 	if err != nil {
+		return r, err
+	}
+	if e.Format == "xml" {
+		c, details, err := parseXML(body, e.Head.Type, p)
+		if err != nil {
+			return r, err
+		}
+		r, err = normalizeConverted(e, c, details, raw, now, p)
+		if r.Bulletin != nil {
+			r.Bulletin.Document = doc(e, body)
+		}
 		return r, err
 	}
 	if e.Format != "json" {
@@ -195,6 +211,14 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 	if err = json.Unmarshal(body, &c); err != nil {
 		return r, errors.New("invalid converted JSON")
 	}
+	return normalizeConverted(e, c, body, raw, now, p)
+}
+
+// Both transports use the same validation, display text and notification semantics.
+func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time, p product) (model.Report, error) {
+	var r model.Report
+	var err error
+	expected := p.classification
 	schema := p.schema
 	if c.Schema.Type != schema || !strings.HasPrefix(c.Schema.Version, "1.") {
 		return r, errors.New("unsupported schema")
@@ -238,7 +262,7 @@ func Normalize(raw []byte, now time.Time) (model.Report, error) {
 	r.Category = p.category
 	r.EventID = bulletinEventID(p, e.Head.Type, c.EventID, e.ID)
 	r.InfoType = c.InfoType
-	r.AffectedAreas = affectedAreas(body, r.TelegramType)
+	r.AffectedAreas = affectedAreas(body, e.Head.Type)
 	r.PressedAt = c.PressedAt
 	r.MessageID = e.ID
 	r.Classification = expected

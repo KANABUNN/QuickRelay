@@ -66,9 +66,11 @@ Apple DeveloperでPush Notifications対応App IDとAPNs用.p8鍵を用意しま�
 - 必要scope: `socket.start`, `socket.close`, `eew.get.forecast`, `eew.get.warning`, `telegram.get.earthquake`。
 - `DMDATA_CLASSIFICATIONS` へ契約済み区分をカンマ区切りで指定します。既定は3区分です。scopeだけでは購読できません。
 - APIキーは `DMDATA_API_KEY`、旧 `DMDATA_TOKEN` も対応。appNameは `Quick Relay` です。
-- 契約済み3区分の20種を処理します。[受信対象と表示](../docs/earthquake-tsunami-products.md)を参照。JSON以外の2種は原文を保存し、試験識別の制約から通知しません。
+- 契約済み3区分の20種を処理します。[受信対象と表示](../docs/earthquake-tsunami-products.md)を参照。非XMLの2種は原文を保存し、試験識別の制約から通知しません。
 
-`POST /v2/socket` に `formatMode=json` と `test=no` を指定し、返されたwss URLへ `dmdata.v2` で接続します。JSON pingへのpong、100秒の無通信監視、指数バックオフ＋jitter、再接続時の新規ticket、終了時の自分のsocketのcloseに対応します。他のアプリのsocketは閉じません。
+`POST /v2/socket` に既定で `formatMode=raw` と `test=no` を指定し、返されたwss URLへ `dmdata.v2` で接続します。JSON pingへのpong、100秒の無通信監視、指数バックオフ＋jitter、再接続時の新規ticket、終了時の自分のsocketのcloseに対応します。他のアプリのsocketは閉じません。
+
+`DMDATA_FORMAT_MODE=json` では移行前と同じ `formats=[json,a/n,binary]` を指定し、非XMLも含む変換JSON方式へ戻せます。`formatMode` と `formats` は併用しません。解析前に受信フレームをSQLiteへ保存し、XMLを直接解析して既存Reportへ正規化します。[移行・検証・性能測定・ロールバック](../docs/dmdata-raw-migration.md)を参照してください。
 
 UTF-8 / base64、非圧縮 / gzip / 単一ファイルzipを扱い、展開後サイズを制限します。訓練・試験報は本文statusでも拒否します。未知schemaや壊れた電文は拒否件数に記録します。
 

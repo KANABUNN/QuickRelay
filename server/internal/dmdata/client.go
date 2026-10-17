@@ -45,17 +45,36 @@ type socketRequest struct {
 	Types           []string `json:"types,omitempty"`
 	Test            string   `json:"test"`
 	AppName         string   `json:"appName"`
-	Formats         []string `json:"formats"`
+	FormatMode      string   `json:"formatMode,omitempty"`
+	Formats         []string `json:"formats,omitempty"`
 }
 
 func New(token, authMode string) (*Client, error) {
 	return NewWithClassifications(token, authMode, nil)
 }
 func NewWithClassifications(token, authMode string, classifications []string) (*Client, error) {
+	return NewWithFormat(token, authMode, classifications, "raw")
+}
+
+// NewWithFormat selects raw reception or the exact previous JSON subscription.
+// Socket Start formatMode and formats are mutually exclusive.
+func NewWithFormat(token, authMode string, classifications []string, mode string) (*Client, error) {
+	if mode == "" {
+		mode = "raw"
+	}
+	if mode != "raw" && mode != "json" {
+		return nil, errors.New("DMDATA_FORMAT_MODE must be raw or json")
+	}
 	if classifications == nil {
 		classifications = []string{"eew.forecast", "eew.warning", "telegram.earthquake"}
 	}
-	request := socketRequest{Test: "no", AppName: "Quick Relay", Formats: []string{"json", "a/n", "binary"}}
+	request := socketRequest{Test: "no", AppName: "Quick Relay"}
+	if mode == "raw" {
+		request.FormatMode = "raw"
+	} else {
+		// Retain both non-XML document types on rollback, using the previous request.
+		request.Formats = []string{"json", "a/n", "binary"}
+	}
 	supported := map[string]bool{"eew.forecast": true, "eew.warning": true, "telegram.earthquake": true}
 	seen := make(map[string]bool)
 	for _, value := range classifications {
@@ -236,6 +255,13 @@ func (c *Client) read(ctx context.Context, conn *websocket.Conn, frames chan<- [
 			Close  bool            `json:"close"`
 		}
 		if err = json.Unmarshal(data, &msg); err != nil {
+			select {
+			case frames <- data:
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return errors.New("DMDATA ingestion queue overflow; reception gap")
+			}
 			return errors.New("invalid DMDATA frame")
 		}
 		switch msg.Type {

@@ -77,3 +77,14 @@ func TestDMDATAAPIKeyAliasAndClassificationSelection(t *testing.T) {
 		t.Fatal("DMDATA configuration")
 	}
 }
+
+func TestDMDATAFormatModeDefaultAndRollback(t *testing.T) {
+	t.Setenv("DMDATA_FORMAT_MODE", "")
+	if Load().DMDATAFormatMode != "raw" {
+		t.Fatal("raw must be default")
+	}
+	t.Setenv("DMDATA_FORMAT_MODE", "json")
+	if Load().DMDATAFormatMode != "json" {
+		t.Fatal("JSON rollback ignored")
+	}
+}

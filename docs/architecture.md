@@ -2,7 +2,8 @@
 
 ```text
 DMDATA API v2 / WebSocket
-  → server/internal/dmdata   電文検証・正規化・通知タイトル/本文生成
+  → server/internal/ingest   SQLite受信記録を解析前にcommit
+  → server/internal/dmdata   XML原電文/変換JSONの検証・正規化・通知タイトル/本文生成
   → server/internal/model    Report / Event / Device / Preferences
   → server/internal/store    SQLite: reports / streams / events / deliveries
   → server/internal/relay    有効期限・lease・再試行・端末別送信
@@ -14,7 +15,7 @@ iOS ↔ Caddy HTTPS ↔ loopback HTTP API（pairing / devices / sync / events）
 
 履歴、最新状態、送信キューは同じDBトランザクションで保存し、APNs送信はcommit後に行います。受信処理と通知送信を分け、APNs障害で保存済みの履歴を失わない構成です。
 
-正式名称と配置は次のとおりです。CLI名とsystemdサービス名は異なります。通信やDBの保存形式は変更していません。
+正式名称と配置は次のとおりです。CLI名とsystemdサービス名は異なります。既存のReport/API・通知キューの形式を維持し、解析前の受信記録テーブルを追加しています。[原電文移行](dmdata-raw-migration.md)を参照してください。
 
 | 項目 | 正規値 |
 |---|---|

@@ -115,6 +115,8 @@ func (s *Server) sourceReport(w http.ResponseWriter, r *http.Request, _ string) 
 	}
 	ext, mime := "bin", "application/octet-stream"
 	switch e.Format {
+	case "xml":
+		ext, mime = "xml", "application/xml; charset=utf-8"
 	case "json":
 		ext, mime = "json", "application/json"
 	case "a/n":

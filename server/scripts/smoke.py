@@ -4,6 +4,8 @@ Run from server/: python scripts/smoke.py --binary .local/quakerelay.exe
 All credentials and data are temporary. No APNs / DMDATA connection is made.
 """
 import argparse
+import base64
+import gzip
 import contextlib
 import datetime as dt
 import json
@@ -118,10 +120,49 @@ with tempfile.TemporaryDirectory(prefix="smoke-", dir=".local") as temp:
         assert status == 200 and not state["deliveries"], "Historical replay must never enqueue APNs"
         assert http("GET", "/metrics", token=token)[0] == 200
 
+        # Published XML input, wrapped in synthetic DMDATA envelopes. No external connection.
+        raw_frames = []
+        samples = pathlib.Path(__file__).resolve().parents[1] / "internal/dmdata/testdata/jma"
+        for filename, telegram, classification in [
+            ("77_01_01_240613_VXSE45.xml", "VXSE45", "eew.forecast"),
+            ("38-39_02_01_250206_VTSE41.xml", "VTSE41", "telegram.earthquake"),
+        ]:
+            body = (samples / filename).read_bytes()
+            raw_frames.append({"type": "data", "id": "official-raw-smoke-" + telegram,
+                               "classification": classification, "head": {"type": telegram, "test": False},
+                               "format": "xml", "encoding": "base64", "compression": "gzip",
+                               "body": base64.b64encode(gzip.compress(body)).decode("ascii")})
+        raw_source = root / "raw-frames.jsonl"
+        raw_source.write_text("\n".join(json.dumps(f) for f in raw_frames), encoding="utf-8")
+        cli("replay", str(raw_source))
+        cli("replay", str(raw_source))  # durable duplicate receipt, one report per upstream ID
+        status, raw_detail = http("GET", "/api/v1/events/20240417231454", token=token)
+        assert status == 200 and len(raw_detail["reports"]) == 1
+        assert raw_detail["event"]["depth_km"] == 40 and raw_detail["event"]["magnitude"] == 4.2
+        with contextlib.closing(sqlite3.connect(root / "relay.db")) as db:
+            assert db.execute("SELECT count(*) FROM received_telegrams").fetchone()[0] == 6
+            assert db.execute("SELECT receptions FROM received_telegrams WHERE receptions=2").fetchall() == [(2,), (2,)]
+            tsunami = json.loads(db.execute("SELECT payload FROM reports WHERE telegram_type='VTSE41'").fetchone()[0])
+        status, source_xml = http("GET", f'/api/v1/reports/{tsunami["id"]}/source', token=token)
+        assert status == 200 and source_xml == (samples / "38-39_02_01_250206_VTSE41.xml").read_bytes().decode("utf-8")
+        assert http("GET", f'/api/v1/reports/{tsunami["id"]}/source')[0] == 401
+
+        ignored = dict(raw_frames[0], format="future", id="unknown-raw-smoke")
+        raw_source.write_text(json.dumps(ignored), encoding="utf-8")
+        cli("replay", str(raw_source))
+        broken = dict(raw_frames[0], body="!invalid-base64", id="invalid-raw-smoke")
+        raw_source.write_text(json.dumps(broken), encoding="utf-8")
+        failed = subprocess.run([binary, "replay", str(raw_source)], env=env, capture_output=True,
+                                text=True, encoding="utf-8", creationflags=flags)
+        assert failed.returncode != 0 and "invalid base64" in failed.stderr
+        with contextlib.closing(sqlite3.connect(root / "relay.db")) as db:
+            assert db.execute("SELECT state,count(*) FROM received_telegrams GROUP BY state ORDER BY state").fetchall() == [
+                ("ignored", 1), ("normalized", 6), ("rejected", 1)]
+            assert db.execute("SELECT count(*) FROM deliveries").fetchone()[0] == 0
         cli("backup", str(root / "backup.db"))
         with contextlib.closing(sqlite3.connect(root / "backup.db")) as db:
             assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-            assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 4
+            assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 6
         proc.terminate()
         proc.wait(timeout=10)
         if os.name != "nt":
@@ -132,7 +173,8 @@ with tempfile.TemporaryDirectory(prefix="smoke-", dir=".local") as temp:
         assert http("DELETE", "/api/v1/devices/me", token=token)[0] == 200
         assert http("GET", "/api/v1/sync", token=token)[0] == 401
         print("PASS: real process, pairing, token registration, authorization, historical replay,")
-        print("      paged history, readiness, metrics, SQLite snapshot/restore read, restart, revocation")
+        print("      raw XML replay/download, rejected/ignored receipt journal, paged history, readiness,")
+        print("      metrics, SQLite snapshot/restore read, restart, revocation")
         print("External DMDATA, Apple APNs and iPhone delivery were not exercised.")
     finally:
         if proc.poll() is None:

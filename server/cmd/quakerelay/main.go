@@ -19,6 +19,7 @@ import (
 	"quakerelay/server/internal/apns"
 	"quakerelay/server/internal/config"
 	"quakerelay/server/internal/dmdata"
+	"quakerelay/server/internal/ingest"
 	"quakerelay/server/internal/relay"
 	"quakerelay/server/internal/store"
 )
@@ -111,19 +112,20 @@ func replay(ctx context.Context, st *store.Store, path string) error {
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 65536), dmdata.MaxMessageBytes)
-	n := 0
+	n, line := 0, 0
+	processor := ingest.Processor{Store: st, Historical: true}
 	for scanner.Scan() {
-		r, err := dmdata.Normalize(scanner.Bytes(), time.Now())
-		if errors.Is(err, dmdata.ErrIgnored) {
-			continue
-		}
+		line++
+		result, err := processor.Process(ctx, scanner.Bytes(), time.Now())
 		if err != nil {
-			return fmt.Errorf("replay line %d: %w", n+1, err)
+			return fmt.Errorf("replay line %d: %w", line, err)
 		}
-		if _, err = st.IngestHistorical(ctx, r); err != nil {
-			return err
+		if result.Rejection != nil {
+			return fmt.Errorf("replay line %d: %w", line, result.Rejection)
 		}
-		n++
+		if result.State == "normalized" {
+			n++
+		}
 	}
 	if err = scanner.Err(); err != nil {
 		return err
@@ -144,7 +146,7 @@ func serve(c config.Config, st *store.Store) error {
 		if err != nil {
 			return err
 		}
-		source, err = dmdata.NewWithClassifications(c.DMDATAToken, c.DMDATAAuthMode, c.DMDATAClassifications)
+		source, err = dmdata.NewWithFormat(c.DMDATAToken, c.DMDATAAuthMode, c.DMDATAClassifications, c.DMDATAFormatMode)
 		if err != nil {
 			return err
 		}
@@ -168,29 +170,27 @@ func serve(c config.Config, st *store.Store) error {
 		go func() {
 			defer wg.Done()
 			source.Run(ctx, func(ctx context.Context, frame []byte) error {
-				r, err := dmdata.Normalize(frame, time.Now())
-				if errors.Is(err, dmdata.ErrIgnored) {
-					return nil
-				}
-				if err != nil {
-					source.Rejected()
-					logger.Warn("DMDATA telegram rejected", "reason", err.Error())
-					return nil
-				}
-				result, err := st.Ingest(ctx, r)
+				processed, err := (ingest.Processor{Store: st}).Process(ctx, frame, time.Now())
 				if err != nil {
 					if ctx.Err() != nil {
 						return ctx.Err()
 					}
 					select {
-					case fatal <- errors.New("ingestion persistence failed"):
+					case fatal <- err:
 					default:
 					}
 					stop()
-					return errors.New("ingestion persistence failed")
+					return err
 				}
-				if result.Inserted {
-					logger.Info("telegram committed", "sequence", result.Sequence, "current", result.Current, "kind", r.Classification)
+				if processed.Rejection != nil {
+					source.Rejected()
+					logger.Warn("DMDATA telegram rejected", "reason", processed.Rejection.Error())
+				}
+				if processed.Ingest.Inserted {
+					logger.Info("telegram committed", "sequence", processed.Ingest.Sequence, "current", processed.Ingest.Current,
+						"kind", processed.Report.Classification, "format_mode", c.DMDATAFormatMode,
+						"archive_us", processed.ArchiveTime.Microseconds(), "normalize_us", processed.NormalizeTime.Microseconds(),
+						"commit_us", processed.CommitTime.Microseconds())
 				}
 				return nil
 			})
