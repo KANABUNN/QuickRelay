@@ -22,7 +22,7 @@ DMDATAの地震情報をGoサーバーで受信し、APNs経由で本人のiOS�
 
 ## 開発・検証
 
-Go 1.26以上とPython 3で、POSIX環境は sh scripts/verify.sh、PowerShellは ./scripts/verify.ps1 を実行します。iOSのビルドとテストはMac/Xcode、またはこのリポジトリのGitHub Actionsで実行します。
+Go 1.27.3以上とPython 3で、POSIX環境は sh scripts/verify.sh、PowerShellは ./scripts/verify.ps1 を実行します。iOSのビルドとテストはMac/Xcode、またはこのリポジトリのGitHub Actionsで実行します。
 
 CIは合成データとループバックの試験サーバーを使い、本番への通知は送りません。Windows・Ubuntu検証、iOS Simulator、Swift/Goの結合試験、署名前Release archiveを確認します。[シミュレーター受入](docs/ios-without-device-acceptance.md)
 
