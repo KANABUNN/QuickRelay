@@ -23,7 +23,7 @@ struct QuickRelayLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.trailing) { Text(context.state.reportLabel).font(.caption) }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(context.state.title).font(.headline).lineLimit(2)
+                        Text(context.state.displayTitle).font(.headline).lineLimit(2)
                         if !context.state.intensityText.isEmpty { Text(context.state.intensityText).font(.subheadline.bold()) }
                         Text(context.state.freshnessLabel(isStale: context.isStale)).font(.caption).lineLimit(2)
                         Text(Date(timeIntervalSince1970: TimeInterval(context.state.reportedAt)), style: .time)
@@ -31,15 +31,29 @@ struct QuickRelayLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                Image(systemName: context.state.symbol).foregroundStyle(context.state.warning ? .orange : .cyan)
+                Image(systemName: context.state.symbol)
+                    .foregroundStyle(compactIconColor(state: context.state, isStale: context.isStale))
             } compactTrailing: {
-                Text(context.state.ended ? "終了" : context.isStale ? "未確認" :
-                     context.state.category == "tsunami" ? "津波" : context.state.reportLabel)
+                Text(compactLabel(state: context.state, isStale: context.isStale))
                     .font(.caption2).lineLimit(1)
             } minimal: {
                 Image(systemName: context.isStale && !context.state.ended ? "clock.badge.exclamationmark" : context.state.symbol)
+                    .foregroundStyle(context.state.highlightsEEWWarning(isStale: context.isStale) ? Color.red : Color.primary)
             }
+            .keylineTint(context.state.highlightsEEWWarning(isStale: context.isStale) ? .red : nil)
             .widgetURL(context.attributes.detailURL)
         }
+    }
+
+    private func compactIconColor(state: QuickRelayActivityAttributes.ContentState, isStale: Bool) -> Color {
+        if state.hasActiveEEWWarning { return isStale ? .primary : .red }
+        return state.warning ? .orange : .cyan
+    }
+
+    private func compactLabel(state: QuickRelayActivityAttributes.ContentState, isStale: Bool) -> String {
+        if state.ended { return "終了" }
+        if isStale { return "未確認" }
+        if state.hasActiveEEWWarning { return "警報" }
+        return state.category == "tsunami" ? "津波" : state.reportLabel
     }
 }

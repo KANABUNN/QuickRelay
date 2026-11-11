@@ -68,6 +68,9 @@
             "warning": {
               "type": "boolean"
             },
+            "eewWarning": {
+              "type": "boolean"
+            },
             "ended": {
               "type": "boolean"
             },

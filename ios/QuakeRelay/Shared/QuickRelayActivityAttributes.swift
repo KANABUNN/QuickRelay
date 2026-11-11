@@ -17,6 +17,19 @@ struct QuickRelayActivityAttributes: ActivityAttributes {
         var cancelled: Bool
         var reportedAt: Int64
         var updatedAt: Int64
+        var eewWarning: Bool? = nil
+
+        var hasActiveEEWWarning: Bool {
+            category == "earthquake" && eewWarning == true && !ended && !cancelled
+        }
+
+        func highlightsEEWWarning(isStale: Bool) -> Bool {
+            hasActiveEEWWarning && !isStale
+        }
+
+        var displayTitle: String {
+            hasActiveEEWWarning ? "緊急地震速報（警報）" : title
+        }
 
         func freshnessLabel(isStale: Bool) -> String {
             if ended { return statusText }
@@ -24,6 +37,7 @@ struct QuickRelayActivityAttributes: ActivityAttributes {
         }
         var symbol: String {
             if cancelled || ended { return "info.circle" }
+            if hasActiveEEWWarning { return "exclamationmark.triangle.fill" }
             return category == "tsunami" ? "water.waves" : "waveform.path.ecg"
         }
     }
@@ -50,7 +64,7 @@ struct QuickRelayLiveActivityCard: View {
                 Spacer()
                 Text(state.reportLabel).font(.caption).lineLimit(1)
             }
-            Text(state.title).font(.headline).lineLimit(1).minimumScaleFactor(0.85)
+            Text(state.displayTitle).font(.headline).lineLimit(1).minimumScaleFactor(0.85)
             if !state.intensityText.isEmpty {
                 Text(state.intensityText).font(.headline).lineLimit(1)
             }
@@ -66,6 +80,15 @@ struct QuickRelayLiveActivityCard: View {
             }.font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
         .padding(14)
+        .overlay {
+            if state.highlightsEEWWarning(isStale: isStale) {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(.red, lineWidth: 3)
+                    .padding(3)
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
+        }
         // The system can truncate Live Activities beyond 160 points. Keep the
         // compact card readable, with full text available through its detail URL.
         .dynamicTypeSize(...DynamicTypeSize.large)

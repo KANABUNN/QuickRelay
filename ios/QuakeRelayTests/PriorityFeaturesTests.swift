@@ -87,11 +87,43 @@ final class PriorityFeaturesTests: XCTestCase {
         let data = #"{"title":"緊急地震速報","summary":"仮定値","statusText":"続報を待機","intensityText":"最大震度 5弱","reportLabel":"第2報","category":"earthquake","warning":true,"ended":false,"cancelled":false,"reportedAt":1791414000,"updatedAt":1791414001}"#.data(using: .utf8)!
         let state = try JSONDecoder().decode(QuickRelayActivityAttributes.ContentState.self, from: data)
         XCTAssertEqual(state.freshnessLabel(isStale: true), "更新が途切れています・最新情報を確認")
+        XCTAssertNil(state.eewWarning)
+        XCTAssertFalse(state.hasActiveEEWWarning)
+        XCTAssertEqual(state.displayTitle, state.title)
         let encoded = try JSONEncoder().encode(state)
         let object = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
         XCTAssertNotNil(object["statusText"])
         XCTAssertNil(object["status_text"])
         let attributes = QuickRelayActivityAttributes(eventID: "202610080001", telegramType: "VXSE45")
         XCTAssertEqual(DeepLinkParser.parse(url: attributes.detailURL!), .event(id: "202610080001", reportID: nil))
+    }
+
+    func testActiveEEWWarningUsesWarningPresentationOnlyForAnOngoingEarthquake() throws {
+        let data = Data(#"{"title":"緊急地震速報（予報）","summary":"強い揺れに警戒してください。","statusText":"続報を待機","intensityText":"最大震度 5弱","reportLabel":"第2報","category":"earthquake","warning":false,"ended":false,"cancelled":false,"reportedAt":1791414000,"updatedAt":1791414001,"eewWarning":true}"#.utf8)
+        var state = try JSONDecoder().decode(QuickRelayActivityAttributes.ContentState.self, from: data)
+        XCTAssertTrue(state.hasActiveEEWWarning)
+        XCTAssertTrue(state.highlightsEEWWarning(isStale: false))
+        XCTAssertFalse(state.highlightsEEWWarning(isStale: true))
+        XCTAssertEqual(state.displayTitle, "緊急地震速報（警報）")
+        XCTAssertEqual(state.symbol, "exclamationmark.triangle.fill")
+
+        let view = QuickRelayLiveActivityCard(state: state, isStale: false)
+        let host = UIHostingController(rootView: view)
+        XCTAssertLessThanOrEqual(host.sizeThatFits(in: CGSize(width: 320, height: 1000)).height, 160)
+        let renderer = ImageRenderer(content: view.frame(width: 320))
+        renderer.scale = 2
+        let attachment = XCTAttachment(image: try XCTUnwrap(renderer.uiImage))
+        attachment.name = "Live Activity EEW warning card 320pt"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        state.cancelled = true
+        XCTAssertFalse(state.hasActiveEEWWarning)
+        state.cancelled = false
+        state.ended = true
+        XCTAssertFalse(state.hasActiveEEWWarning)
+        state.ended = false
+        state.category = "tsunami"
+        XCTAssertFalse(state.hasActiveEEWWarning)
     }
 }
