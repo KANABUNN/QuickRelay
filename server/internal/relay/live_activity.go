@@ -21,6 +21,7 @@ type LiveContent struct {
 	ReportLabel   string `json:"reportLabel"`
 	Category      string `json:"category"`
 	Warning       bool   `json:"warning"`
+	EEWWarning    bool   `json:"eewWarning,omitempty"`
 	Ended         bool   `json:"ended"`
 	Cancelled     bool   `json:"cancelled"`
 	ReportedAt    int64  `json:"reportedAt"`
@@ -37,6 +38,7 @@ func liveText(s string, n int) string {
 func liveContent(r model.Report, now time.Time, end bool, forced bool) LiveContent {
 	state := LiveContent{Title: liveText(r.Title, 80), Summary: liveText(r.Body, 220), Category: r.CategoryName(),
 		Warning: r.Warning, Ended: end, Cancelled: r.Cancelled, ReportedAt: r.ReportedAt.Unix(), UpdatedAt: now.Unix()}
+	state.EEWWarning = r.TelegramType == "VXSE43" && !end && !r.Cancelled && !r.Final && now.Before(r.LiveActivityDeadline())
 	state.StatusText = "続報を待機"
 	state.ReportLabel = "発表"
 	if r.IsEEW() && r.Serial != nil {
@@ -57,6 +59,8 @@ func liveContent(r model.Report, now time.Time, end bool, forced bool) LiveConte
 		state.StatusText = "受信終了（最終報）"
 	case r.TelegramType == "VTSE41" && !r.Warning:
 		state.StatusText = "この発表に警報・注意報なし"
+	case end:
+		state.StatusText = "表示を終了"
 	case r.TelegramType == "VTSE41":
 		state.StatusText = "津波警報・注意報"
 	}
@@ -66,7 +70,10 @@ func LivePayload(r model.Report, p model.Preferences, event string, now time.Tim
 	end := event == "end"
 	aps := map[string]any{"timestamp": now.Unix(), "event": event, "content-state": liveContent(r, now, end, forced)}
 	stale := now.Add(time.Minute)
-	if r.TelegramType == "VTSE41" {
+	switch r.TelegramType {
+	case "VXSE43":
+		stale = r.LiveActivityDeadline()
+	case "VTSE41":
 		stale = now.Add(15 * time.Minute)
 	}
 	if end {
@@ -93,7 +100,7 @@ func LivePayload(r model.Report, p model.Preferences, event string, now time.Tim
 		aps["alert"] = alert
 		aps["interruption-level"] = normal["interruption-level"]
 		aps["attributes-type"] = "QuickRelayActivityAttributes"
-		aps["attributes"] = map[string]any{"eventID": r.EventID, "telegramType": r.TelegramType, "startSequence": r.ServerSequence}
+		aps["attributes"] = map[string]any{"eventID": r.EventID, "telegramType": r.LiveActivityKey(), "startSequence": r.ServerSequence}
 	}
 	b, err := json.Marshal(payload)
 	if err == nil && len(b) > 4096 {
@@ -106,7 +113,7 @@ func (w *Worker) liveStart(ctx context.Context, d store.Delivery, device model.D
 	if !device.Preferences.LiveActivitiesEnabled {
 		return false, nil
 	}
-	existing, lookupErr := w.Store.LiveActivity(ctx, d.DeviceID, d.Report.EventID, d.Report.TelegramType)
+	existing, lookupErr := w.Store.LiveActivity(ctx, d.DeviceID, d.Report.EventID, d.Report.LiveActivityKey())
 	if lookupErr == nil && existing.StartSequence == d.Report.ServerSequence && existing.LastSequence >= d.Report.ServerSequence && existing.LastTimestamp > 0 {
 		return true, nil
 	}
@@ -135,6 +142,23 @@ func (w *Worker) liveStart(ctx context.Context, d store.Delivery, device model.D
 	return accepted, nil
 }
 
+// Both streams can wake the same activity. Prefer a current, eligible warning
+// without letting one stream's cancellation cancel the other stream.
+func eewLiveDisplay(forecast, warning model.Report, p model.Preferences, now time.Time) (model.Report, bool) {
+	if forecast.Final && !forecast.Cancelled {
+		return forecast, true
+	}
+	for _, report := range []model.Report{warning, forecast} {
+		if report.StartsLiveActivity() && now.Before(report.LiveActivityDeadline()) && p.Allows(report, false) {
+			return report, false
+		}
+	}
+	if forecast.ServerSequence == 0 || warning.EndsNotificationLifecycle() && warning.ServerSequence > forecast.ServerSequence {
+		return warning, true
+	}
+	return forecast, true
+}
+
 func (w *Worker) LiveStep(ctx context.Context) (bool, error) {
 	now := time.Now()
 	if w.Now != nil {
@@ -147,7 +171,8 @@ func (w *Worker) LiveStep(ctx context.Context) (bool, error) {
 	finish := func(status, reason string, next time.Time, ended bool, timestamp int64) (bool, error) {
 		return true, w.Store.FinishLiveJob(ctx, *job, status, reason, next, ended, timestamp)
 	}
-	live, err := w.Store.LiveActivity(ctx, job.DeviceID, job.Report.EventID, job.Report.TelegramType)
+	key := job.Report.LiveActivityKey()
+	live, err := w.Store.LiveActivity(ctx, job.DeviceID, job.Report.EventID, key)
 	if errors.Is(err, store.ErrNotFound) {
 		return finish("skipped", "not_started", now, false, 0)
 	}
@@ -162,23 +187,33 @@ func (w *Worker) LiveStep(ctx context.Context) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	following := live.StartSequence > 0 || live.LastSequence > 0
-	end := job.ForceEnd || live.State == "ending" || !device.Active || !device.PushActive ||
-		!device.Preferences.LiveActivitiesEnabled || !device.Preferences.Allows(job.Report, following) ||
-		job.Report.EndsNotificationLifecycle()
-	if !job.ForceEnd && live.State != "ending" {
-		latest, err := w.Store.Stream(ctx, job.Report.EventID, job.Report.TelegramType)
-		if err != nil {
-			return true, err
-		}
-		if latest.ServerSequence > job.Report.ServerSequence {
-			return finish("skipped", "superseded", now, false, 0)
+	report := job.Report
+	forced := job.ForceEnd || live.State == "ending"
+	end := forced || !device.Active || !device.PushActive || !device.Preferences.LiveActivitiesEnabled || !device.Preferences.NotificationsEnabled
+	job.Revision = job.Report.ServerSequence
+	if !forced {
+		if key == "VXSE45" {
+			forecast, warning, err := w.Store.EEWLiveReports(ctx, job.Report.EventID)
+			if err != nil {
+				return true, err
+			}
+			var complete bool
+			report, complete = eewLiveDisplay(forecast, warning, device.Preferences, now)
+			end = end || complete
+			job.Revision = max(forecast.ServerSequence, warning.ServerSequence)
+		} else {
+			latest, err := w.Store.Stream(ctx, job.Report.EventID, job.Report.TelegramType)
+			if err != nil {
+				return true, err
+			}
+			if latest.ServerSequence > job.Report.ServerSequence {
+				return finish("skipped", "superseded", now, false, 0)
+			}
+			end = end || !device.Preferences.Allows(report, true) || report.EndsNotificationLifecycle()
 		}
 	}
-	if !end {
-		if job.Report.ServerSequence <= live.LastSequence {
-			return finish("skipped", "already_sent", now, false, 0)
-		}
+	if !end && job.Revision <= live.LastSequence {
+		return finish("skipped", "already_sent", now, false, 0)
 	}
 	if live.Token == "" {
 		next := now.Add(time.Second)
@@ -194,7 +229,7 @@ func (w *Worker) LiveStep(ctx context.Context) (bool, error) {
 	if end {
 		event = "end"
 	}
-	body, err := LivePayload(job.Report, device.Preferences, event, now, job.ForceEnd || live.State == "ending")
+	body, err := LivePayload(report, device.Preferences, event, now, forced)
 	if err != nil {
 		return finish("failed", "invalid_payload", now, false, 0)
 	}

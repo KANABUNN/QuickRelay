@@ -38,6 +38,31 @@ func (s *Store) Stream(ctx context.Context, event, telegram string) (model.Repor
 	}
 	return r, err
 }
+
+// Read both independently ordered EEW streams from the same snapshot.
+func (s *Store) EEWLiveReports(ctx context.Context, event string) (forecast, warning model.Report, err error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT telegram_type,payload FROM streams
+        WHERE event_id=? AND telegram_type IN ('VXSE45','VXSE43')`, event)
+	if err != nil {
+		return forecast, warning, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var telegram, data string
+		if err = rows.Scan(&telegram, &data); err != nil {
+			return forecast, warning, err
+		}
+		report := &forecast
+		if telegram == "VXSE43" {
+			report = &warning
+		}
+		if err = json.Unmarshal([]byte(data), report); err != nil {
+			return forecast, warning, err
+		}
+	}
+	return forecast, warning, rows.Err()
+}
+
 func (s *Store) RegisterLiveStartToken(ctx context.Context, device, token string, now time.Time) error {
 	if !apns.ValidToken(token) {
 		return ErrInvalid
@@ -59,9 +84,10 @@ func (s *Store) RegisterLiveStartToken(ctx context.Context, device, token string
 }
 
 func (s *Store) ReserveLiveStart(ctx context.Context, device string, r model.Report, now time.Time) (string, error) {
-	if !r.StartsLiveActivity() || now.Sub(r.ReportedAt) >= r.TTL() {
+	if !r.StartsLiveActivity() || !now.Before(r.LiveActivityDeadline()) {
 		return "", nil
 	}
+	key := r.LiveActivityKey()
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
@@ -74,6 +100,13 @@ func (s *Store) ReserveLiveStart(ctx context.Context, device string, r model.Rep
 	if currentID != r.ID {
 		return "", nil
 	}
+	if r.TelegramType == "VXSE43" {
+		var forecastFinal bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM streams WHERE event_id=? AND telegram_type='VXSE45'
+            AND json_extract(payload,'$.is_final')=1 AND json_extract(payload,'$.is_cancelled')=0)`, r.EventID).Scan(&forecastFinal); err != nil || forecastFinal {
+			return "", err
+		}
+	}
 	var token string
 	err = tx.QueryRowContext(ctx, "SELECT token FROM live_activity_start_tokens WHERE device_id=?", device).Scan(&token)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -84,7 +117,7 @@ func (s *Store) ReserveLiveStart(ctx context.Context, device string, r model.Rep
 	}
 	var seq, lastSequence int64
 	var state string
-	err = tx.QueryRowContext(ctx, "SELECT start_sequence,last_sequence,state FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", device, r.EventID, r.TelegramType).Scan(&seq, &lastSequence, &state)
+	err = tx.QueryRowContext(ctx, "SELECT start_sequence,last_sequence,state FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", device, r.EventID, key).Scan(&seq, &lastSequence, &state)
 	if err == nil {
 		if seq == r.ServerSequence && state == "starting" {
 			return token, tx.Commit()
@@ -92,7 +125,7 @@ func (s *Store) ReserveLiveStart(ctx context.Context, device string, r model.Rep
 		if state == "ended" && r.TelegramType == "VTSE41" && r.ServerSequence > lastSequence {
 			_, err = tx.ExecContext(ctx, `UPDATE live_activities SET activity_id='',token='',state='starting',
                 start_sequence=?,last_sequence=0,last_timestamp=0,updated_ms=? WHERE device_id=? AND event_id=? AND telegram_type=?`,
-				r.ServerSequence, now.UnixMilli(), device, r.EventID, r.TelegramType)
+				r.ServerSequence, now.UnixMilli(), device, r.EventID, key)
 			if err != nil {
 				return "", err
 			}
@@ -104,7 +137,7 @@ func (s *Store) ReserveLiveStart(ctx context.Context, device string, r model.Rep
 		return "", err
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO live_activities(device_id,event_id,telegram_type,start_sequence,created_ms,updated_ms)
-        VALUES(?,?,?,?,?,?)`, device, r.EventID, r.TelegramType, r.ServerSequence, now.UnixMilli(), now.UnixMilli())
+		VALUES(?,?,?,?,?,?)`, device, r.EventID, key, r.ServerSequence, now.UnixMilli(), now.UnixMilli())
 	if err != nil {
 		return "", err
 	}
@@ -118,10 +151,10 @@ func (s *Store) FinishLiveStart(ctx context.Context, device string, r model.Repo
 	defer tx.Rollback()
 	if accepted {
 		_, err = tx.ExecContext(ctx, `UPDATE live_activities SET last_sequence=max(last_sequence,?),last_timestamp=max(last_timestamp,?),updated_ms=?
-            WHERE device_id=? AND event_id=? AND telegram_type=? AND start_sequence=?`, r.ServerSequence, now.Unix(), now.UnixMilli(), device, r.EventID, r.TelegramType, r.ServerSequence)
+			WHERE device_id=? AND event_id=? AND telegram_type=? AND start_sequence=?`, r.ServerSequence, now.Unix(), now.UnixMilli(), device, r.EventID, r.LiveActivityKey(), r.ServerSequence)
 	} else {
 		_, err = tx.ExecContext(ctx, "DELETE FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=? AND start_sequence=? AND token='' AND state='starting'",
-			device, r.EventID, r.TelegramType, r.ServerSequence)
+			device, r.EventID, r.LiveActivityKey(), r.ServerSequence)
 		if err == nil && invalid {
 			_, err = tx.ExecContext(ctx, "DELETE FROM live_activity_start_tokens WHERE device_id=? AND token=?", device, token)
 		}
@@ -136,22 +169,28 @@ func (s *Store) RegisterLiveActivityToken(ctx context.Context, device, event, te
 	if !ValidID(event) || !ValidID(activity) || !apns.ValidToken(token) {
 		return ErrInvalid
 	}
+	if telegram != "VXSE45" && telegram != "VTSE41" {
+		return ErrNotFound
+	}
 	deviceState, err := s.Device(ctx, device)
 	if err != nil {
 		return err
-	}
-	report, err := s.Stream(ctx, event, telegram)
-	if err != nil {
-		return err
-	}
-	if !report.SupportsLiveActivity() {
-		return ErrInvalid
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	var latestSequence int64
+	err = tx.QueryRowContext(ctx, `SELECT CAST(json_extract(payload,'$.server_sequence') AS INTEGER) FROM streams
+        WHERE event_id=? AND (telegram_type=? OR (?='VXSE45' AND telegram_type='VXSE43'))
+        ORDER BY 1 DESC LIMIT 1`, event, telegram, telegram).Scan(&latestSequence)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
 	// A finished or dismissed activity is not resurrected by a late token.
 	var state, oldActivity string
 	var start int64
@@ -182,7 +221,7 @@ func (s *Store) RegisterLiveActivityToken(ctx context.Context, device, event, te
 	_, err = tx.ExecContext(ctx, `INSERT INTO live_activity_jobs(report_sequence,device_id,force_end,next_attempt_ms,expires_ms,updated_ms)
         VALUES(?,?,?,?,?,?) ON CONFLICT(report_sequence,device_id) DO UPDATE SET status='pending',force_end=excluded.force_end,
         next_attempt_ms=excluded.next_attempt_ms,expires_ms=excluded.expires_ms WHERE live_activity_jobs.status IN ('pending','retry','skipped','expired','accepted')`,
-		report.ServerSequence, device, forceEnd, now.UnixMilli(), now.Add(time.Minute).UnixMilli(), now.UnixMilli())
+		latestSequence, device, forceEnd, now.UnixMilli(), now.Add(time.Minute).UnixMilli(), now.UnixMilli())
 	if err != nil {
 		return err
 	}
@@ -224,9 +263,10 @@ func (s *Store) StopLiveActivities(ctx context.Context, device string, now time.
 		return err
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO live_activity_jobs(report_sequence,device_id,force_end,next_attempt_ms,expires_ms,updated_ms)
-        SELECT json_extract(s.payload,'$.server_sequence'),a.device_id,1,?,?,? FROM live_activities a
-        JOIN streams s ON s.event_id=a.event_id AND s.telegram_type=a.telegram_type
+		SELECT max(CAST(json_extract(s.payload,'$.server_sequence') AS INTEGER)),a.device_id,1,?,?,? FROM live_activities a
+		JOIN streams s ON s.event_id=a.event_id AND (s.telegram_type=a.telegram_type OR (a.telegram_type='VXSE45' AND s.telegram_type='VXSE43'))
         WHERE a.device_id=? AND a.state='ending'
+		GROUP BY a.device_id,a.event_id,a.telegram_type
         ON CONFLICT(report_sequence,device_id) DO UPDATE SET force_end=1,status='pending',
         next_attempt_ms=excluded.next_attempt_ms,expires_ms=excluded.expires_ms`, now.UnixMilli(), now.Add(time.Minute).UnixMilli(), now.UnixMilli(), device)
 	if err != nil {
@@ -240,6 +280,7 @@ type LiveJob struct {
 	DeviceID          string
 	ActivityID, Token string
 	Report            model.Report
+	Revision          int64
 	ForceEnd          bool
 	Attempts          int
 	Expires           time.Time
@@ -290,7 +331,7 @@ func (s *Store) FinishLiveJob(ctx context.Context, j LiveJob, status, reason str
 	defer tx.Rollback()
 	if j.Token != "" {
 		var currentToken string
-		if err = tx.QueryRowContext(ctx, "SELECT token FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", j.DeviceID, j.Report.EventID, j.Report.TelegramType).Scan(&currentToken); err != nil {
+		if err = tx.QueryRowContext(ctx, "SELECT token FROM live_activities WHERE device_id=? AND event_id=? AND telegram_type=?", j.DeviceID, j.Report.EventID, j.Report.LiveActivityKey()).Scan(&currentToken); err != nil {
 			return err
 		}
 		if currentToken != "" && currentToken != j.Token {
@@ -311,9 +352,10 @@ func (s *Store) FinishLiveJob(ctx context.Context, j LiveJob, status, reason str
 		if ended {
 			state = "ended"
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE live_activities SET last_sequence=max(last_sequence,?),last_timestamp=max(last_timestamp,?),state=?,
+		_, err = tx.ExecContext(ctx, `UPDATE live_activities SET last_sequence=max(last_sequence,?),last_timestamp=max(last_timestamp,?),
+            state=CASE WHEN state='ending' AND NOT ? THEN state ELSE ? END,
             token=CASE WHEN ? THEN '' ELSE token END,updated_ms=? WHERE device_id=? AND event_id=? AND telegram_type=? AND activity_id=? AND token=?`,
-			j.Report.ServerSequence, timestamp, state, ended, time.Now().UnixMilli(), j.DeviceID, j.Report.EventID, j.Report.TelegramType, j.ActivityID, j.Token)
+			max(j.Report.ServerSequence, j.Revision), timestamp, ended, state, ended, time.Now().UnixMilli(), j.DeviceID, j.Report.EventID, j.Report.LiveActivityKey(), j.ActivityID, j.Token)
 		if err != nil {
 			return err
 		}
