@@ -31,6 +31,7 @@ struct ReceiverStatusView: View {
             let state = ReceiverState.resolve(status: environment.receiverStatus,
                 checkedAt: environment.receiverStatusCheckedAt,
                 failed: environment.receiverStatusError != nil, now: context.date)
+            let timing = timingText
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Label(state.label, systemImage: state == .healthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     .font(.caption.weight(.semibold))
@@ -38,8 +39,7 @@ struct ReceiverStatusView: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("receiverStatus")
                 Spacer(minLength: 4)
-                Text("確認 " + (environment.receiverStatusCheckedAt.map(DisplayTime.time) ?? "未実行")
-                     + " · 同期 " + (repository.lastSyncAt.map(DisplayTime.time) ?? "未実行"))
+                Text(timing)
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -49,5 +49,13 @@ struct ReceiverStatusView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.thinMaterial, ignoresSafeAreaEdges: [])
         }
+    }
+
+    private var timingText: String {
+        var checked = "未実行"
+        if let date = environment.receiverStatusCheckedAt { checked = DisplayTime.time(date) }
+        var synced = "未実行"
+        if let date = repository.lastSyncAt { synced = DisplayTime.time(date) }
+        return "確認 \(checked) · 同期 \(synced)"
     }
 }
