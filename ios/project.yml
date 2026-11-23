@@ -109,6 +109,7 @@ targets:
     sources:
       - path: QuickRelayLiveActivity/QuickRelayLiveActivity.swift
       - path: QuakeRelay/Shared/QuickRelayActivityAttributes.swift
+      - path: QuakeRelay/Shared/SeismicScale.swift
     resources:
       - path: QuakeRelay/Resources/PrivacyInfo.xcprivacy
     settings:
@@ -131,6 +132,7 @@ targets:
           - Resources
           - README.md
       - path: QuakeRelay/Shared/WatchSnapshot.swift
+      - path: QuakeRelay/Shared/SeismicScale.swift
     resources:
       - path: QuickRelayWatch/Resources/Assets.xcassets
       - path: QuickRelayWatch/Resources/PrivacyInfo.xcprivacy

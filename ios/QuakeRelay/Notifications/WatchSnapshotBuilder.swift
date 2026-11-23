@@ -45,7 +45,8 @@ enum WatchSnapshotBuilder {
                 updatedAt: event.latestReportAt, publicationStatus: String(stateText.prefix(120)),
                 isOngoing: continuation.isOngoing, ongoingReason: String(continuation.explanation.prefix(160)),
                 ongoingUntil: continuation.until, tsunamiWarning: activeReport.flatMap(warningSummary),
-                tsunamiObservations: observations.isEmpty ? nil : observations))
+                tsunamiObservations: observations.isEmpty ? nil : observations,
+                detail: detail(for: event, reports: eventReports, continuation: continuation)))
         }
         var snapshot = WatchSnapshot(generatedAt: now, lastSyncAt: lastSyncAt,
             receiverSummary: receiverSummary, events: selected)
@@ -66,12 +67,81 @@ enum WatchSnapshotBuilder {
                 snapshot.events[i].summary = ""
                 snapshot.events[i].ongoingReason = nil
                 snapshot.events[i].title = String(snapshot.events[i].title.prefix(40))
+                snapshot.events[i].detail?.areas = nil
+                snapshot.events[i].detail?.comment = nil
+                if !snapshot.events[i].isOngoing { snapshot.events[i].detail?.tsunamiLevels = nil }
             }
         }
         guard try snapshot.encoded().count <= byteBudget else {
             throw CocoaError(.fileWriteOutOfSpace)
         }
         return snapshot
+    }
+
+    static let areaLimit = 8
+    static let tsunamiAreaLimit = 12
+
+    /// Structured values shown by the Watch. Warning M/depth stay hidden.
+    static func detail(for event: EventEntity, reports: [ReportEntity], continuation: EventContinuation) -> WatchEventDetail? {
+        func clip(_ value: String?, _ length: Int) -> String? { value.map { String($0.prefix(length)) } }
+        switch event.category {
+        case "earthquake":
+            let summary = EarthquakeEventSummary(reports: reports)
+            let hypocenter = summary.hypocenterReport?.numericHypocenter
+            let warningOnly = summary.hypocenterReport.map { $0.isEEW && EEWStream($0) == .warning } ?? false
+            let observed = summary.observedMax
+            let forecast = summary.forecastMax
+            var detail = WatchEventDetail()
+            let typeName: String = RelayEventType(rawValue: event.eventType)?.displayName ?? event.displayTitle
+            let kindLabel: String = event.isEEW
+                ? typeName + " " + event.publicationLabel
+                : event.displayTitle + " · " + event.publicationLabel
+            detail.kindLabel = clip(kindLabel, 60)
+            detail.intensity = (observed ?? forecast)?.displayText
+            detail.intensityIsForecast = observed == nil && forecast != nil ? true : nil
+            detail.originTime = ServerDateParser.parse(hypocenter?.originTime)
+            if !warningOnly {
+                detail.magnitude = ValueText.magnitude(hypocenter).map { hypocenter?.isAssumed == true ? $0 + "（仮定）" : $0 }
+                detail.depth = hypocenter?.depthText
+            }
+            detail.hypocenterNote = clip(hypocenter?.qualification, 80)
+            if let warning = summary.warningReport, !warning.isCancelled, continuation.reportIDs.contains(warning.id) {
+                detail.isEEWWarning = true
+            }
+            if let report = summary.commentReport {
+                detail.comment = clip(BulletinLayout(bulletin: report.bulletin).text(.warningComment), 120)
+            }
+            if let report = summary.observedReport {
+                let tree = IntensityObservationTree(sections: BulletinLayout(bulletin: report.bulletin).intensitySections)
+                let nodes = tree.groups(atDepth: tree.summaryDepth).flatMap(\.nodes)
+                let areas = nodes.prefix(areaLimit).compactMap { node in
+                    node.intensity.map { WatchAreaIntensity(name: String(node.name.prefix(24)), intensity: $0.displayText) }
+                }
+                detail.areas = areas.isEmpty ? nil : areas
+            } else if let forecastReport = summary.forecastReport, !forecastReport.isCancelled {
+                let areas = EEWPresentation.forecastAreas(forecastReport).prefix(areaLimit).compactMap { area in
+                    IntensityReading(area.maxIntensity).map { WatchAreaIntensity(name: String(area.name.prefix(24)), intensity: $0.displayText) }
+                }
+                detail.areas = areas.isEmpty ? nil : areas
+            }
+            return detail
+        case "tsunami":
+            var detail = WatchEventDetail()
+            guard let latest = TsunamiPublication.latest(in: reports, eventID: event.id) else { return nil }
+            detail.kindLabel = clip(latest.title + " · " + latest.publicationLabel, 60)
+            guard !latest.isCancelled else { return detail }
+            let levels = TsunamiForecastGroup.groups(latest).map { group in
+                WatchTsunamiLevel(title: group.title,
+                    areas: group.entries.prefix(tsunamiAreaLimit).map {
+                        WatchTsunamiArea(name: String($0.name.prefix(24)), height: clip($0.maxHeight, 24))
+                    },
+                    remaining: group.entries.count > tsunamiAreaLimit ? group.entries.count - tsunamiAreaLimit : nil)
+            }
+            detail.tsunamiLevels = levels.isEmpty ? nil : levels
+            return detail
+        default:
+            return nil
+        }
     }
 
     private static func warningSummary(_ report: ReportEntity) -> WatchTsunamiWarning? {

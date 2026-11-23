@@ -2,6 +2,7 @@ import Combine
 import Foundation
 
 enum AppTab: Hashable {
+    case overview
     case events
     case tsunami
     case advisory
@@ -42,8 +43,9 @@ enum DeepLinkParser {
 
 @MainActor
 final class DeepLinkRouter: ObservableObject {
-    @Published var selectedTab: AppTab = .events
+    @Published var selectedTab: AppTab = .overview
     @Published var path: [AppRoute] = []
+    @Published var overviewPath: [AppRoute] = []
 
     @Published var tsunamiPath: [AppRoute] = []
     @Published var advisoryPath: [AppRoute] = []
@@ -64,8 +66,9 @@ final class DeepLinkRouter: ObservableObject {
 
     func reset() {
         path.removeAll()
+        overviewPath.removeAll()
         tsunamiPath.removeAll()
         advisoryPath.removeAll()
-        selectedTab = .events
+        selectedTab = .overview
     }
 }

@@ -49,8 +49,7 @@ struct EventMapView: View {
                         }
                         ForEach(observations.points) { point in
                             Annotation(point.name, coordinate: point.coordinate) {
-                                Text(point.intensity).font(.caption.bold()).padding(5)
-                                    .foregroundStyle(.white).background(intensityColor(point.intensity), in: RoundedRectangle(cornerRadius: 5))
+                                IntensityBadge(reading: IntensityReading(point.intensity), size: 26)
                                     .accessibilityLabel("\(point.name) 観測震度\(point.intensity)")
                             }
                         }
@@ -112,14 +111,6 @@ struct EventMapView: View {
                 do { catalog = try await repository.stationCatalog(); camera = initialPosition }
                 catch { self.error = "観測地点の位置情報を取得できません。震源・沿岸と発表内容は引き続き確認できます。" }
             }
-        }
-    }
-    private func intensityColor(_ value: String) -> Color {
-        switch IntensityValue.rank(value) ?? 0 {
-        case 7...: .red
-        case 5...6: .orange
-        case 4: .brown
-        default: .blue
         }
     }
     private func coastColor(_ kind: String) -> Color {
