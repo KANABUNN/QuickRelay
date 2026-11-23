@@ -35,6 +35,7 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 	fp.ReceivedAt = time.Time{}
 	fp.Raw = nil
 	fp.ServerSequence = 0
+	fp.TsunamiAreas = nil // Keep fingerprints computed by older installations valid.
 	fpBytes, _ := json.Marshal(fp)
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO reports(id,message_id,fingerprint,event_id,telegram_type,payload,raw,received_ms)
  VALUES(?,?,?,?,?,'{}',?,?)`, r.ID, r.MessageID, Hash(string(fpBytes)), r.EventID, r.TelegramType, []byte(r.Raw), r.ReceivedAt.UnixMilli())
@@ -112,6 +113,13 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 			}
 		}
 	}
+	if current && notify && r.TelegramType == "VTSE41" {
+		latest, err := latestTsunamiReport(ctx, tx)
+		if err != nil {
+			return out, err
+		}
+		notify = latest.ServerSequence == r.ServerSequence
+	}
 	if current && notify && r.PushEligible() {
 		_, err = tx.ExecContext(ctx, `INSERT INTO deliveries(report_sequence,device_id,next_attempt_ms,expires_ms,updated_ms)
           SELECT ?,installation_id,?,?,? FROM devices WHERE revoked=0 AND push_active=1`,
@@ -121,10 +129,16 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 		}
 	}
 	if current && notify && r.SupportsLiveActivity() {
-		_, err = tx.ExecContext(ctx, `INSERT INTO live_activity_jobs(report_sequence,device_id,next_attempt_ms,expires_ms,updated_ms)
-            SELECT ?,installation_id,?,?,? FROM devices WHERE revoked=0 AND push_active=1
-            AND json_extract(preferences,'$.notifications_enabled')=1 AND json_extract(preferences,'$.live_activities_enabled')=1`,
-			r.ServerSequence, r.ReceivedAt.UnixMilli(), r.ReportedAt.Add(r.TTL()).UnixMilli(), r.ReceivedAt.UnixMilli())
+		query := `INSERT INTO live_activity_jobs(report_sequence,device_id,event_id,next_attempt_ms,expires_ms,updated_ms)
+            SELECT ?,installation_id,?, ?,?,? FROM devices WHERE revoked=0 AND push_active=1
+            AND json_extract(preferences,'$.notifications_enabled')=1 AND json_extract(preferences,'$.live_activities_enabled')=1`
+		args := []any{r.ServerSequence, r.EventID, r.ReceivedAt.UnixMilli(), r.ReportedAt.Add(r.TTL()).UnixMilli(), r.ReceivedAt.UnixMilli()}
+		if r.TelegramType == "VTSE41" {
+			query = `INSERT INTO live_activity_jobs(report_sequence,device_id,event_id,next_attempt_ms,expires_ms,updated_ms)
+                SELECT ?,device_id,event_id,?,?,? FROM live_activities WHERE telegram_type='VTSE41' AND state IN ('starting','active','ending')`
+			args = []any{r.ServerSequence, r.ReceivedAt.UnixMilli(), r.ReportedAt.Add(r.TTL()).UnixMilli(), r.ReceivedAt.UnixMilli()}
+		}
+		_, err = tx.ExecContext(ctx, query, args...)
 		if err != nil {
 			return out, err
 		}

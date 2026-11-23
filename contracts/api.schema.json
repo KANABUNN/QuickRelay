@@ -161,6 +161,22 @@
           "items": {
             "$ref": "#/$defs/AffectedArea"
           }
+        },
+        "tsunami_areas": {
+          "type": "array",
+          "description": "VTSE41 forecast zones with current and previous JMA announcement codes.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "code": {"type": "string"},
+              "name": {"type": "string"},
+              "kind": {"type": "string"},
+              "kind_name": {"type": "string"},
+              "last_kind": {"type": "string"}
+            }
+          }
         }
       }
     },
@@ -347,6 +363,10 @@
             "minLength": 1,
             "maxLength": 60
           }
+        },
+        "tsunami_observations_enabled": {
+          "type": "boolean",
+          "description": "Controls tsunami observation notifications. When omitted, observations follow the tsunami_info event type."
         },
         "minimum_intensity": {
           "enum": [

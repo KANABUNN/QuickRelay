@@ -8,21 +8,47 @@ struct ReportChange: Identifiable, Equatable {
 }
 
 struct TsunamiPublication {
+    enum WarningLevel: CaseIterable, Hashable {
+        case major, warning, advisory
+
+        init?(kind: String) {
+            switch kind {
+            case "大津波警報", "大津波警報：発表": self = .major
+            case "津波警報": self = .warning
+            case "津波注意報": self = .advisory
+            default: return nil
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .major: "大津波警報"
+            case .warning: "津波警報"
+            case .advisory: "津波注意報"
+            }
+        }
+    }
+
     struct Area: Identifiable {
         var id: String { name }
         let name: String
         let kind: String
         let previousKind: String?
         let height: String?
-        var warning: Bool { Self.warningKind(kind) }
-        private static func warningKind(_ kind: String) -> Bool {
-            ["大津波警報", "大津波警報：発表", "津波警報", "津波注意報"].contains(kind)
-        }
+        var warningLevel: WarningLevel? { WarningLevel(kind: kind) }
+        var warning: Bool { warningLevel != nil }
         var withdrawn: Bool {
             kind.contains("解除") || (kind.contains("津波予報") &&
-                previousKind.map { Self.warningKind($0) } == true)
+                previousKind.flatMap(WarningLevel.init(kind:)) != nil)
         }
     }
+
+    struct WarningGroup: Identifiable {
+        var id: WarningLevel { level }
+        let level: WarningLevel
+        let areas: [Area]
+    }
+
     let report: ReportEntity
     var areas: [Area] {
         guard report.telegramType == "VTSE41" || report.telegramType == "VTSE51" else { return [] }
@@ -45,6 +71,16 @@ struct TsunamiPublication {
         if !areas.isEmpty && areas.allSatisfy({ $0.kind.contains("津波予報") }) { return "津波予報（海面変動に注意）" }
         return nil
     }
+
+    var warnings: [WarningGroup] {
+        guard report.telegramType == "VTSE41", !report.isCancelled else { return [] }
+        let areas = self.areas
+        return WarningLevel.allCases.compactMap { level in
+            let matching = areas.filter { $0.warningLevel == level }
+            return matching.isEmpty ? nil : WarningGroup(level: level, areas: matching)
+        }
+    }
+
     static func latest(in reports: [ReportEntity], eventID: String) -> ReportEntity? {
         reports.filter { $0.eventId == eventID && $0.telegramType == "VTSE41" }
             .max(by: ReportPublicationOrder.areInAscendingOrder)
@@ -119,5 +155,97 @@ enum ReportPublicationOrder {
         }
         if rank(lhs) != rank(rhs) { return rank(lhs) < rank(rhs) }
         return lhs.serverSequence < rhs.serverSequence
+    }
+}
+
+struct TsunamiObservation {
+    enum Kind: CaseIterable, Equatable {
+        case coastal, offshore, estimate
+
+        var title: String {
+            switch self {
+            case .coastal: "沿岸で観測"
+            case .offshore: "沖合で観測"
+            case .estimate: "沿岸での推定"
+            }
+        }
+
+        var telegramType: String { self == .coastal ? "VTSE51" : "VTSE52" }
+        var sectionPrefix: String { self == .estimate ? "沿岸の推定：" : "津波観測：" }
+    }
+
+    struct Group {
+        let kind: Kind
+        let report: ReportEntity
+        let observations: [TsunamiObservation]
+    }
+
+    let name: String
+    let firstWave: String?
+    let maximumWave: String?
+    let section: BulletinSectionDTO
+
+    static func groups(in reports: [ReportEntity]) -> [Group] {
+        Kind.allCases.compactMap { kind in
+            let candidates = reports.filter { report in
+                guard report.telegramType == kind.telegramType else { return false }
+                // VTSE51 also carries tide times and estimated arrivals on its own.
+                return kind != .coastal || report.isCancelled ||
+                    report.bulletin?.sections?.contains { $0.title.hasPrefix(kind.sectionPrefix) } == true
+            }
+            guard let report = candidates.max(by: ReportPublicationOrder.areInAscendingOrder),
+                  !report.isCancelled else { return nil }
+            let observations = (report.bulletin?.sections ?? []).compactMap { section -> Self? in
+                guard section.title.hasPrefix(kind.sectionPrefix) else { return nil }
+                let name = String(section.title.dropFirst(kind.sectionPrefix.count))
+                let firstLabel = kind == .estimate ? "第1波の推定" : "第1波"
+                let maximumLabel = kind == .estimate ? "最大波の推定" : "最大波"
+                guard !name.isEmpty else { return nil }
+                let firstWave = section.rows?.first { $0.label == firstLabel }?.value
+                let maximumWave = section.rows?.first { $0.label == maximumLabel }?.value
+                return Self(name: name, firstWave: firstWave, maximumWave: maximumWave, section: section)
+            }
+            guard !observations.isEmpty else { return nil }
+            let ranked = observations.enumerated().map { (
+                index: $0.offset, observation: $0.element, priority: $0.element.priority
+            ) }.sorted { lhs, rhs in
+                lhs.priority == rhs.priority ? lhs.index < rhs.index : lhs.priority > rhs.priority
+            }.map(\.observation)
+            return Group(kind: kind, report: report, observations: ranked)
+        }
+    }
+
+    private var priority: (urgency: Int, height: Double) {
+        let maximum = maximumWave ?? ""
+        let first = firstWave ?? ""
+        let height = Self.heightInMeters(maximum) ?? 0
+        if maximum.contains("上昇中") { return (5, height) }
+        if maximum.contains("重要") || Self.isUpdate(maximum) { return (4, height) }
+        if Self.isUpdate(first) || first.contains(" JST") || first.contains("到達を確認") ||
+            first.components(separatedBy: " / ").contains(where: { $0 == "押し" || $0 == "引き" }) {
+            return (3, height)
+        }
+        if height > 0 { return (2, height) }
+        if (!maximum.isEmpty && !maximum.contains("欠測")) ||
+            (!first.isEmpty && !first.contains("欠測")) { return (1, 0) }
+        return (0, 0)
+    }
+
+    private static func isUpdate(_ wave: String) -> Bool {
+        let revise = wave.components(separatedBy: " / ").last
+        return revise == "更新" || revise == "追加"
+    }
+
+    private static func heightInMeters(_ wave: String) -> Double? {
+        let normalized = wave.folding(options: .widthInsensitive, locale: Locale(identifier: "ja_JP"))
+        for part in normalized.components(separatedBy: " / ") {
+            guard let unit = part.firstIndex(of: "m"), !part.contains("未満") else { continue }
+            let value = part[..<unit].trimmingCharacters(in: .whitespaces)
+            let centimeters = value.hasSuffix("c")
+            let digits = centimeters ? value.dropLast() : value[...]
+            guard let number = Double(digits), number.isFinite, number >= 0 else { continue }
+            return centimeters ? number / 100 : number
+        }
+        return nil
     }
 }

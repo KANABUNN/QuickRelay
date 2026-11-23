@@ -6,17 +6,29 @@ struct WatchHomeView: View {
     var body: some View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 15)) { context in
+                let warning = snapshots.snapshot?.isPaired == true
+                    ? snapshots.snapshot?.events.first { $0.activeTsunamiWarning(at: context.date) != nil }?.tsunamiWarning
+                    : nil
                 List {
+                    if let warning {
+                        NavigationLink {
+                            WatchEventListView(category: .tsunami)
+                        } label: {
+                            WatchTsunamiWarningView(warning: warning)
+                        }
+                    }
                     WatchFreshnessView(snapshot: snapshots.snapshot, now: context.date)
                     NavigationLink {
                         WatchEventListView(category: .earthquake)
                     } label: {
                         categoryLabel("地震", symbol: "waveform.path.ecg", category: .earthquake, now: context.date)
                     }
-                    NavigationLink {
-                        WatchEventListView(category: .tsunami)
-                    } label: {
-                        categoryLabel("津波", symbol: "water.waves", category: .tsunami, now: context.date)
+                    if warning == nil {
+                        NavigationLink {
+                            WatchEventListView(category: .tsunami)
+                        } label: {
+                            categoryLabel("津波", symbol: "water.waves", category: .tsunami, now: context.date)
+                        }
                     }
                     WatchSyncButton()
                 }
@@ -53,14 +65,20 @@ private struct WatchEventListView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 15)) { context in
             let ongoing = events.filter { $0.isOngoing(at: context.date) }
+            let hasTsunamiWarning = ongoing.contains { $0.activeTsunamiWarning(at: context.date) != nil }
             List {
-                WatchFreshnessView(snapshot: snapshots.snapshot, now: context.date)
+                if !hasTsunamiWarning {
+                    WatchFreshnessView(snapshot: snapshots.snapshot, now: context.date)
+                }
                 if !ongoing.isEmpty {
                     Section("発表中") {
                         ForEach(ongoing) { event in
                             eventLink(event, now: context.date).id("ongoing-" + event.id)
                         }
                     }
+                }
+                if hasTsunamiWarning {
+                    WatchFreshnessView(snapshot: snapshots.snapshot, now: context.date)
                 }
                 Section("履歴") {
                     if events.isEmpty {
@@ -97,14 +115,24 @@ private struct WatchEventRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(event.title).font(.headline).lineLimit(3)
-            if event.isOngoing(at: now) {
-                WatchOngoingLabel()
+            if let warning = event.activeTsunamiWarning(at: now) {
+                WatchTsunamiWarningView(warning: warning)
+            } else {
+                Text(event.title).font(.headline).lineLimit(3)
+                if event.isOngoing(at: now) {
+                    WatchOngoingLabel()
+                }
+                Text(event.watchPublicationStatus(at: now)).font(.caption).foregroundStyle(.secondary).lineLimit(3)
             }
-            Text(event.watchPublicationStatus(at: now)).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-            if !event.summary.isEmpty { Text(event.summary).font(.caption).lineLimit(3) }
-            Text(event.updatedAt, format: .dateTime.month().day().hour().minute())
-                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            if let observation = event.tsunamiObservations?.max(by: { $0.issuedAt < $1.issuedAt }) {
+                WatchTsunamiObservationView(observation: observation, compact: true)
+            } else if !event.summary.isEmpty {
+                Text(event.summary).font(.caption).lineLimit(3)
+            }
+            if event.activeTsunamiWarning(at: now) == nil {
+                Text(event.updatedAt, format: .dateTime.month().day().hour().minute())
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 3)
     }
@@ -123,12 +151,21 @@ private struct WatchEventDetailView: View {
             List {
                 if let event {
                     Section {
-                        Text(event.title).font(.headline)
-                        if event.isOngoing(at: context.date) {
-                            WatchOngoingLabel()
-                            if let reason = event.ongoingReason { Text(reason).font(.caption) }
+                        if let warning = event.activeTsunamiWarning(at: context.date) {
+                            WatchTsunamiWarningView(warning: warning)
+                        } else {
+                            Text(event.title).font(.headline)
+                            if event.isOngoing(at: context.date) {
+                                WatchOngoingLabel()
+                                if let reason = event.ongoingReason { Text(reason).font(.caption) }
+                            }
                         }
                         Text(event.watchPublicationStatus(at: context.date)).font(.callout)
+                    }
+                    ForEach(event.tsunamiObservations ?? []) { observation in
+                        Section {
+                            WatchTsunamiObservationView(observation: observation)
+                        }
                     }
                     if !event.summary.isEmpty {
                         Section("発表内容") { Text(event.summary).font(.callout) }
@@ -159,6 +196,42 @@ private struct WatchEventDetailView: View {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Text(date, format: .dateTime.month().day().hour().minute().second())
                 .font(.callout.monospacedDigit())
+        }
+    }
+}
+
+private struct WatchTsunamiWarningView: View {
+    let warning: WatchTsunamiWarning
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Label(warning.title, systemImage: "exclamationmark.triangle.fill")
+                .font(.headline).foregroundStyle(.orange)
+            Text(warning.scope).font(.caption)
+            Text("発表 \(warning.issuedAt.formatted(.dateTime.month().day().hour().minute()))")
+                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct WatchTsunamiObservationView: View {
+    let observation: WatchTsunamiObservation
+    var compact = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(observation.source).font(.caption2).foregroundStyle(.secondary)
+            Text(observation.name).font(.caption.bold()).lineLimit(compact ? 2 : nil)
+            if let maximum = observation.maximumWave {
+                Text("最大波 \(maximum)").font(.caption).lineLimit(compact ? 3 : nil)
+            }
+            if let first = observation.firstWave {
+                Text("第1波 \(first)").font(.caption).lineLimit(compact ? 3 : nil)
+            }
+            if !compact {
+                Text("発表 \(observation.issuedAt.formatted(.dateTime.month().day().hour().minute()))")
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -228,6 +301,10 @@ private struct WatchSyncButton: View {
 }
 
 private extension WatchEventSnapshot {
+    func activeTsunamiWarning(at date: Date) -> WatchTsunamiWarning? {
+        isOngoing(at: date) ? tsunamiWarning : nil
+    }
+
     func watchPublicationStatus(at date: Date) -> String {
         if isOngoing, ongoingUntil != nil, !isOngoing(at: date) {
             return category == .tsunami ? "津波予報の有効期間を終了" : "緊急地震速報の対象時間を終了"

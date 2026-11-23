@@ -34,7 +34,8 @@ struct SettingsView: View {
                     .disabled(!settings.notificationsEnabled)
                 if settings.tsunamiNotificationsEnabled {
                     Toggle("津波警報・注意報", isOn: $settings.tsunamiWarningEnabled)
-                    Toggle("津波予報・観測情報", isOn: $settings.tsunamiObservationsEnabled)
+                    Toggle("津波予報・満潮・到達予想", isOn: $settings.tsunamiForecastEnabled)
+                    Toggle("津波観測情報（沿岸・沖合）", isOn: $settings.tsunamiObservationsEnabled)
                 }
                 Toggle("南海トラフ・地震関連情報", isOn: $settings.advisoryNotificationsEnabled)
                     .disabled(!settings.notificationsEnabled)

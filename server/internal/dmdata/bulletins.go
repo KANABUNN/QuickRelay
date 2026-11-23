@@ -203,18 +203,18 @@ func bulletinSummary(b *model.Bulletin, fallback string) string {
 	}
 	return fallback
 }
-func tsunamiAlert(data []byte) bool {
+func tsunamiForecastAreas(data []byte) []model.TsunamiArea {
 	var top object
 	_ = json.Unmarshal(data, &top)
+	var areas []model.TsunamiArea
 	for _, v := range items(at(top, "body", "tsunami", "forecasts")) {
-		code := str(at(obj(v), "kind", "code"))
-		// JMA: 51/52/53 warnings; 62 advisory. 50/60 are withdrawals,
-		// and 71/72/73 indicate slight sea-level changes, not warnings.
-		if code == "51" || code == "52" || code == "53" || code == "62" {
-			return true
-		}
+		a := obj(v)
+		areas = append(areas, model.TsunamiArea{
+			Code: str(a["code"]), Name: str(a["name"]), Kind: str(at(a, "kind", "code")),
+			KindName: str(at(a, "kind", "name")), LastKind: str(at(a, "kind", "lastKind", "code")),
+		})
 	}
-	return false
+	return areas
 }
 func nankaiAlert(data []byte) bool {
 	var top object

@@ -91,7 +91,7 @@ func TestPreferencePatchPreservesUnmentionedFiltersAndScopesActivityTokens(t *te
 		app.ServeHTTP(w, req)
 		return w
 	}
-	patch := `{"earthquake_regions":["宮崎県"],"tsunami_regions":["宮崎県"],"minimum_intensity":"4","live_activities_enabled":true}`
+	patch := `{"earthquake_regions":["宮崎県"],"tsunami_regions":["宮崎県"],"tsunami_observations_enabled":false,"minimum_intensity":"4","live_activities_enabled":true}`
 	if w := call("PATCH", "devices/me/preferences", patch, credential); w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -101,6 +101,9 @@ func TestPreferencePatchPreservesUnmentionedFiltersAndScopesActivityTokens(t *te
 	d, _ := st.Device(ctx, "phone")
 	if d.Preferences.MinimumIntensity != "4" || len(d.Preferences.EarthquakeRegions) != 1 || !d.Preferences.LiveActivitiesEnabled || d.Preferences.CustomSoundEnabled {
 		t.Fatal("partial patch erased fields")
+	}
+	if d.Preferences.TsunamiObservationsEnabled == nil || *d.Preferences.TsunamiObservationsEnabled {
+		t.Fatal("observation opt-out was not persisted")
 	}
 	for _, bad := range []string{`{"minimum_intensity":"unknown"}`, `{"earthquake_regions":[" 宮崎県"]}`, `{"tsunami_regions":["宮崎県","宮崎県"]}`} {
 		if w := call("PATCH", "devices/me/preferences", bad, credential); w.Code != 400 {

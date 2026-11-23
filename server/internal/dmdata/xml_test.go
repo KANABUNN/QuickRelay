@@ -205,6 +205,16 @@ func TestXMLTsunamiReleaseCancelAndObservation(t *testing.T) {
 	if err != nil || !strings.Contains(string(text), "沿岸の推定") || !strings.Contains(string(text), "津波観測") || !strings.Contains(string(text), "1.8m") {
 		t.Fatal("observation/estimation lost", string(text), err)
 	}
+	summary := obs.TsunamiObservationSummary([]string{"高知県"})
+	for _, want := range []string{"三重尾鷲沖", "最大波 09/01 07:15 JST", "2.0m", "沿岸の推定 高知県", "巨大"} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("want %q in %q", want, summary)
+		}
+	}
+	forecast, err := Normalize(transport(t, "VTSE51", "xml", operational(fixture(t, "32-39_11_03_250206_VTSE51.xml"))), xmlNow)
+	if err != nil || forecast.IsTsunamiObservation() {
+		t.Fatal("forecast-only VTSE51 was treated as observation", forecast.Title, err)
+	}
 }
 func TestXMLMalformedMissingAndUnknown(t *testing.T) {
 	source := fixture(t, firstEEW)

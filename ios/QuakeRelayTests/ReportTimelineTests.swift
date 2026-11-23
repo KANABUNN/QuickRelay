@@ -135,6 +135,29 @@ final class ReportTimelineTests: XCTestCase {
 }
 
 extension ReportTimelineTests {
+    @MainActor
+    func testTsunamiObservationPreferenceMigratesAndSavesSeparately() throws {
+        let suite = "tsunami-preferences.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(false, forKey: "settings.tsunamiObservations")
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertFalse(settings.tsunamiForecastEnabled)
+        XCTAssertFalse(settings.tsunamiObservationsEnabled)
+
+        settings.tsunamiObservationsEnabled = true
+        let preferences = settings.devicePreferences
+        XCTAssertEqual(preferences.tsunamiObservationsEnabled, true)
+        XCTAssertFalse(preferences.eventTypes.contains("tsunami_info"))
+
+        settings.expandedPreferencesSaved()
+        let reopened = AppSettings(defaults: defaults)
+        reopened.apply(preferences)
+        XCTAssertFalse(reopened.tsunamiForecastEnabled)
+        XCTAssertTrue(reopened.tsunamiObservationsEnabled)
+        XCTAssertTrue(reopened.tsunamiNotificationsEnabled)
+    }
+
     func testOnlyEEWHasNumberedReportsIncludingOldCachedOrdinaryReports() {
         XCTAssertEqual(PublicationLabel.text(eventType: "eew_forecast", serial: 3, infoType: "発表", cancelled: false), "第3報")
         for type in ["earthquake_info", "earthquake_update", "tsunami_info", "tsunami_warning", "nankai_info"] {
