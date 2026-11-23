@@ -183,6 +183,19 @@ private struct EEWSection: View {
                         Button("すべての報を見る（\(entries.count)件）") { showingAll = true }
                             .font(.subheadline)
                             .buttonStyle(.borderless)
+                            .sheet(isPresented: $showingAll) {
+                                NavigationStack {
+                                    ScrollView {
+                                        EEWHistoryGrid(entries: Array(entries.reversed())).padding()
+                                    }
+                                    .navigationTitle("緊急地震速報の推移")
+                                    .navigationBarTitleDisplayMode(.inline)
+                                    .toolbar {
+                                        ToolbarItem(placement: .confirmationAction) { Button("閉じる") { showingAll = false } }
+                                    }
+                                }
+                                .presentationDetents([.large])
+                            }
                     }
                 }
             }
@@ -190,19 +203,6 @@ private struct EEWSection: View {
             Text("緊急地震速報")
         } footer: {
             Text("予報・警報の報数は別々に数えられます。警報のマグニチュード・深さは表示しません。震動の到達までの秒読みは表示しません。")
-        }
-        .sheet(isPresented: $showingAll) {
-            NavigationStack {
-                ScrollView {
-                    EEWHistoryGrid(entries: Array(entries.reversed())).padding()
-                }
-                .navigationTitle("緊急地震速報の推移")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) { Button("閉じる") { showingAll = false } }
-                }
-            }
-            .presentationDetents([.large])
         }
     }
 }
@@ -434,16 +434,17 @@ struct ObservedIntensitySection: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("intensityObservations")
+                // Attach the sheet to one row: a modifier on a Section applies to every row.
+                .sheet(isPresented: $showingAll) {
+                    IntensityObservationsView(tree: tree, title: "各地の震度")
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                }
             }
         } header: {
             Text(tree.summaryDepth == 2 ? "各地の震度（細分区域）" : "各地の震度")
         } footer: {
             Text((TelegramCatalog.label(for: report)) + " · " + DisplayTime.full(report.occurredAt ?? report.receivedAt) + " 発表")
-        }
-        .sheet(isPresented: $showingAll) {
-            IntensityObservationsView(tree: tree, title: "各地の震度")
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
     }
 }
@@ -475,16 +476,16 @@ private struct LongPeriodSection: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("longPeriodObservations")
+                .sheet(isPresented: $showingAll) {
+                    IntensityObservationsView(tree: tree, title: "長周期地震動の観測")
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                }
             }
         } header: {
             Text("長周期地震動")
         } footer: {
             Text((TelegramCatalog.label(for: report)) + " · " + DisplayTime.full(report.occurredAt ?? report.receivedAt) + " 発表")
-        }
-        .sheet(isPresented: $showingAll) {
-            IntensityObservationsView(tree: tree, title: "長周期地震動の観測")
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
     }
 }

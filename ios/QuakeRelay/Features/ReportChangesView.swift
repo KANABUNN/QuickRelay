@@ -19,6 +19,13 @@ struct ReportChangesView: View {
                     if changes.count > inlineLimit {
                         Button("変更点をすべて見る（\(changes.count)項目）") { showingAll = true }
                             .accessibilityIdentifier("allReportChanges")
+                            .sheet(isPresented: $showingAll) {
+                                NavigationStack {
+                                    List(changes) { change in changeRow(change) }
+                                        .navigationTitle("前回からの変更").navigationBarTitleDisplayMode(.inline)
+                                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { showingAll = false } } }
+                                }.presentationDetents([.large])
+                            }
                     }
                 }
             } else {
@@ -27,13 +34,6 @@ struct ReportChangesView: View {
             }
         } header: {
             Text(changes.isEmpty ? "前回からの変更" : "前回からの変更（\(changes.count)項目）")
-        }
-        .sheet(isPresented: $showingAll) {
-            NavigationStack {
-                List(changes) { change in changeRow(change) }
-                    .navigationTitle("前回からの変更").navigationBarTitleDisplayMode(.inline)
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { showingAll = false } } }
-            }.presentationDetents([.large])
         }
     }
 
