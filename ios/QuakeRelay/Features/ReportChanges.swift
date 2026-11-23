@@ -206,12 +206,19 @@ struct TsunamiObservation {
                 return Self(name: name, firstWave: firstWave, maximumWave: maximumWave, section: section)
             }
             guard !observations.isEmpty else { return nil }
-            let ranked = observations.enumerated().map { (
-                index: $0.offset, observation: $0.element, priority: $0.element.priority
-            ) }.sorted { lhs, rhs in
-                lhs.priority == rhs.priority ? lhs.index < rhs.index : lhs.priority > rhs.priority
-            }.map(\.observation)
-            return Group(kind: kind, report: report, observations: ranked)
+            let ranked = observations.enumerated().map { entry in
+                (index: entry.offset, observation: entry.element, priority: entry.element.priority)
+            }
+            let sorted = ranked.sorted { lhs, rhs in
+                if lhs.priority.urgency != rhs.priority.urgency {
+                    return lhs.priority.urgency > rhs.priority.urgency
+                }
+                if lhs.priority.height != rhs.priority.height {
+                    return lhs.priority.height > rhs.priority.height
+                }
+                return lhs.index < rhs.index
+            }
+            return Group(kind: kind, report: report, observations: sorted.map { $0.observation })
         }
     }
 
