@@ -18,6 +18,7 @@ struct QuickRelayActivityAttributes: ActivityAttributes {
         var reportedAt: Int64
         var updatedAt: Int64
         var eewWarning: Bool? = nil
+        var detailEventID: String? = nil
 
         var hasActiveEEWWarning: Bool {
             category == "earthquake" && eewWarning == true && !ended && !cancelled
@@ -46,6 +47,14 @@ struct QuickRelayActivityAttributes: ActivityAttributes {
     var startSequence: Int64 = 0
 
     var detailURL: URL? {
+        Self.eventURL(eventID)
+    }
+
+    func detailURL(for state: ContentState) -> URL? {
+        state.detailEventID.flatMap(Self.eventURL) ?? detailURL
+    }
+
+    private static func eventURL(_ eventID: String) -> URL? {
         guard !eventID.isEmpty,
               eventID.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-").contains($0) }) else { return nil }
         return URL(string: "quake-relay://event/\(eventID)")

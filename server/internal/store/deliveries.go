@@ -12,12 +12,13 @@ import (
 )
 
 type Delivery struct {
-	ID       int64
-	DeviceID string
-	Report   model.Report
-	Attempts int
-	APNsID   string
-	Expires  time.Time
+	ID                  int64
+	DeviceID            string
+	Report              model.Report
+	Attempts            int
+	APNsID              string
+	Expires             time.Time
+	TsunamiWarningAreas []model.TsunamiArea
 }
 
 func (s *Store) Claim(ctx context.Context, now time.Time) (*Delivery, error) {
@@ -58,11 +59,27 @@ func (s *Store) Claim(ctx context.Context, now time.Time) (*Delivery, error) {
 	return &d, tx.Commit()
 }
 func (s *Store) Finish(ctx context.Context, d Delivery, status, reason string, next time.Time) error {
-	_, err := s.DB.ExecContext(ctx, `UPDATE deliveries SET status=?,reason=?,next_attempt_ms=?,lease_until_ms=0,updated_ms=?
- WHERE id=? AND status='sending' AND attempts=?`, status, reason, next.UnixMilli(), time.Now().UnixMilli(), d.ID, d.Attempts)
+	var warningAreas any
+	if status == "accepted" && d.Report.TelegramType == "VTSE41" {
+		areas := d.TsunamiWarningAreas
+		if areas == nil {
+			areas = []model.TsunamiArea{}
+		}
+		data, err := json.Marshal(areas)
+		if err != nil {
+			return err
+		}
+		warningAreas = string(data)
+	}
+	_, err := s.DB.ExecContext(ctx, `UPDATE deliveries SET status=?,reason=?,next_attempt_ms=?,lease_until_ms=0,updated_ms=?,tsunami_warning_areas=?
+ WHERE id=? AND status='sending' AND attempts=?`, status, reason, next.UnixMilli(), time.Now().UnixMilli(), warningAreas, d.ID, d.Attempts)
 	return err
 }
 func (s *Store) Superseded(ctx context.Context, r model.Report, retry bool) (bool, error) {
+	if r.TelegramType == "VTSE41" {
+		latest, err := s.LatestTsunamiReport(ctx)
+		return latest.ID != r.ID, err
+	}
 	var raw string
 	err := s.DB.QueryRowContext(ctx, "SELECT payload FROM streams WHERE event_id=? AND telegram_type=?", r.EventID, r.TelegramType).Scan(&raw)
 	if err != nil {

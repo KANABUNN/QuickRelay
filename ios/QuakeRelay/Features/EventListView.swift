@@ -142,10 +142,16 @@ struct EventListView: View {
     }
 
     private func eventLink(_ event: EventEntity, groups: [String: [ReportEntity]], continuation: EventContinuation) -> some View {
-        NavigationLink(value: AppRoute.event(id: event.id, reportID: nil)) {
+        let reports = groups[event.id] ?? []
+        let tsunamiReport = TsunamiPublication.latest(in: reports, eventID: event.id)
+        let observation = tsunamiReport != nil && continuation.isOngoing ?
+            TsunamiObservation.groups(in: reports).max {
+                ReportPublicationOrder.areInAscendingOrder($0.report, $1.report)
+            } : nil
+        return NavigationLink(value: AppRoute.event(id: event.id, reportID: nil)) {
             EventRow(event: event, unread: history.isUnread(event, scope: scope),
                      pinned: history.isPinned(event.id, scope: scope),
-                     tsunamiReport: TsunamiPublication.latest(in: groups[event.id] ?? [], eventID: event.id),
+                     tsunamiReport: tsunamiReport, tsunamiObservation: observation,
                      continuation: continuation)
         }
         .swipeActions(edge: .leading) {
@@ -171,15 +177,36 @@ private struct EventRow: View {
     var unread = false
     var pinned = false
     var tsunamiReport: ReportEntity?
+    var tsunamiObservation: TsunamiObservation.Group?
     var continuation = EventContinuation.history
 
+    private var activeTsunamiWarning: TsunamiPublication? {
+        guard let report = tsunamiReport, continuation.reportIDs.contains(report.id) else { return nil }
+        let publication = TsunamiPublication(report: report)
+        return publication.warnings.isEmpty ? nil : publication
+    }
+
     var body: some View {
+        let warning = activeTsunamiWarning
+        let headline = warning?.report.title ?? event.displayTitle
         VStack(alignment: .leading, spacing: 6) {
+            if let warning {
+                TsunamiWarningSummary(publication: warning, compact: true)
+            }
+            if let group = tsunamiObservation, let point = group.observations.first {
+                Text("\(group.kind.title) \(point.name)").font(.subheadline.bold())
+                if let maximum = point.maximumWave {
+                    Text("最大波 \(maximum)").font(.caption)
+                }
+                if let first = point.firstWave {
+                    Text("第1波 \(first)").font(.caption)
+                }
+            }
             HStack(alignment: .firstTextBaseline) {
                 if unread { Circle().fill(Color.accentColor).frame(width: 7, height: 7).accessibilityLabel("未読") }
                 if pinned { Image(systemName: "pin.fill").font(.caption).foregroundStyle(.blue).accessibilityLabel("ピン留め") }
-                Text(event.category == "earthquake" ? (event.numericHypocenter.epicenter ?? event.displayTitle) : event.displayTitle)
-                    .font(.headline)
+                Text(event.category == "earthquake" ? (event.numericHypocenter.epicenter ?? headline) : headline)
+                    .font(warning == nil ? .headline : .subheadline)
                 if event.numericHypocenter.isAssumed {
                     StatusBadge(text: "仮定震源", color: .orange)
                 }
@@ -193,7 +220,7 @@ private struct EventRow: View {
                 Label("継続中", systemImage: "dot.radiowaves.left.and.right")
                     .font(.caption.bold()).foregroundStyle(.orange)
                     .accessibilityIdentifier("ongoing-" + event.id)
-                Text(continuation.explanation).font(.caption).foregroundStyle(.secondary)
+                if warning == nil { Text(continuation.explanation).font(.caption).foregroundStyle(.secondary) }
             } else if continuation.state == .unknown {
                 Text("継続状況未確認").font(.caption.bold()).foregroundStyle(.orange)
             }
@@ -208,7 +235,7 @@ private struct EventRow: View {
             }
             .font(.subheadline)
 
-            if let report = tsunamiReport, let status = TsunamiPublication(report: report).status {
+            if warning == nil, let report = tsunamiReport, let status = TsunamiPublication(report: report).status {
                 Label(status, systemImage: report.isCancelled ? "xmark.octagon" : "water.waves")
                     .font(.caption.bold()).foregroundStyle(report.isCancelled ? .orange : .blue)
                 Text("警報・注意報の発表 \((report.occurredAt ?? report.receivedAt).formatted(date: .abbreviated, time: .shortened))")
@@ -219,9 +246,11 @@ private struct EventRow: View {
             }
 
             HStack(spacing: 8) {
-                Text(event.isEEW ? (RelayEventType(rawValue: event.eventType)?.displayName ?? event.displayTitle) : event.displayTitle)
-                Text(event.publicationLabel)
-                if event.isCancelled {
+                if event.category != "tsunami" {
+                    Text(event.isEEW ? (RelayEventType(rawValue: event.eventType)?.displayName ?? event.displayTitle) : event.displayTitle)
+                }
+                Text(warning?.report.publicationLabel ?? event.publicationLabel)
+                if warning == nil && event.isCancelled {
                     StatusBadge(text: "取消", color: .orange)
                 } else if event.isEEW && event.isFinal {
                     StatusBadge(text: "最終", color: .blue)
@@ -231,6 +260,57 @@ private struct EventRow: View {
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+struct TsunamiWarningSummary: View {
+    let publication: TsunamiPublication
+    var compact = false
+
+    var body: some View {
+        let warnings = publication.warnings
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(warnings) { warning in
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(warning.level.title, systemImage: "exclamationmark.triangle.fill")
+                        .font(warning.level == warnings.first?.level ? .headline : .subheadline.bold())
+                        .foregroundStyle(color(for: warning.level))
+                    let areas = warning.areas.prefix(3)
+                    let remaining = warning.areas.count - areas.count
+                    if remaining > 0 && !compact {
+                        DisclosureGroup(areaNames(areas) + " ほか\(remaining)予報区") {
+                            Text(areaNames(warning.areas.dropFirst(areas.count)))
+                        }
+                        .font(.subheadline)
+                    } else {
+                        Text(areaNames(areas) + (remaining > 0 ? " ほか\(remaining)予報区" : ""))
+                            .font(compact ? .caption : .subheadline)
+                    }
+                }
+            }
+            LabeledContent("警報・注意報の発表時刻", value: (publication.report.occurredAt ?? publication.report.receivedAt)
+                .formatted(date: .abbreviated, time: compact ? .shortened : .standard))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if publication.areas.contains(where: \.withdrawn) {
+                Text("一部の予報区で解除").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func areaNames(_ areas: ArraySlice<TsunamiPublication.Area>) -> String {
+        areas.map { area in
+            guard !compact, let height = area.height else { return area.name }
+            return "\(area.name)（予想される高さ \(height)）"
+        }.joined(separator: "、")
+    }
+
+    private func color(for level: TsunamiPublication.WarningLevel) -> Color {
+        switch level {
+        case .major: .purple
+        case .warning: .red
+        case .advisory: .orange
+        }
     }
 }
 

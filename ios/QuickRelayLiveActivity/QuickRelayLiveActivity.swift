@@ -13,7 +13,7 @@ struct QuickRelayLiveActivity: Widget {
             QuickRelayLiveActivityCard(state: context.state, isStale: context.isStale)
             .activityBackgroundTint(Color(.secondarySystemBackground))
             .activitySystemActionForegroundColor(.primary)
-            .widgetURL(context.attributes.detailURL)
+            .widgetURL(context.attributes.detailURL(for: context.state))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -41,7 +41,7 @@ struct QuickRelayLiveActivity: Widget {
                     .foregroundStyle(context.state.highlightsEEWWarning(isStale: context.isStale) ? Color.red : Color.primary)
             }
             .keylineTint(context.state.highlightsEEWWarning(isStale: context.isStale) ? .red : nil)
-            .widgetURL(context.attributes.detailURL)
+            .widgetURL(context.attributes.detailURL(for: context.state))
         }
     }
 

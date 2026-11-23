@@ -88,6 +88,22 @@ final class MediumFeaturesTests: XCTestCase {
         let seaChange = report("sea", sequence: 5, sections: [area("宮崎県", kind: "津波予報（若干の海面変動）", previous: "津波警報")])
         XCTAssertEqual(TsunamiPublication(report: seaChange).status, "警報・注意報の解除を発表")
     }
+    func testTsunamiWarningDisplayPrioritizesCurrentSeverityAndPreservesAreaHeights() {
+        let sections = [area("注意報沿岸", kind: "津波注意報"),
+                        area("解除沿岸", kind: "津波警報解除"),
+                        area("警報沿岸", kind: "津波警報", height: "高い"),
+                        area("大津波警報沿岸", kind: "大津波警報：発表", height: "巨大"),
+                        area("予報沿岸", kind: "津波予報（若干の海面変動）")]
+        let warnings = TsunamiPublication(report: report("warning", sequence: 1, sections: sections)).warnings
+        XCTAssertEqual(warnings.map(\.level), [.major, .warning, .advisory])
+        XCTAssertEqual(warnings.map { $0.areas.map(\.name) }, [["大津波警報沿岸"], ["警報沿岸"], ["注意報沿岸"]])
+        XCTAssertEqual(warnings.first?.areas.first?.height, "巨大")
+
+        let cancelled = report("cancelled", sequence: 2, cancelled: true, sections: sections)
+        let observation = report("observation", sequence: 3, type: "VTSE51", sections: sections)
+        XCTAssertTrue(TsunamiPublication(report: cancelled).warnings.isEmpty)
+        XCTAssertTrue(TsunamiPublication(report: observation).warnings.isEmpty)
+    }
     func testLateOriginalAndObservationsCannotReplaceTsunamiCancellationState() {
         let cancel = report("cancel", sequence: 2, cancelled: true)
         let original = report("late", sequence: 3, sections: [area("宮崎県", kind: "津波警報")])
@@ -148,5 +164,15 @@ final class MediumFeaturesTests: XCTestCase {
         XCTAssertEqual(mapped.count, 1); XCTAssertEqual(mapped.first?.kind, "津波警報")
         XCTAssertEqual(mapped.first?.height, "3 m")
         XCTAssertTrue(MapDataBuilder.coasts(report("cancel", sequence: 2, cancelled: true, sections: current.bulletin?.sections ?? []), catalog: catalog).isEmpty)
+
+        let station = BulletinSectionDTO(title: "津波観測：観測点", rows: [
+            BulletinRowDTO(label: "地域", value: "宮崎県"),
+            BulletinRowDTO(label: "最大波", value: "観測中"),
+        ])
+        let observed = report("observed", sequence: 3, type: "VTSE51", sections: [
+            area("宮崎県", kind: "津波警報"), area("高知県", kind: "津波注意報"), station,
+        ])
+        XCTAssertEqual(MapDataBuilder.coasts(observed, catalog: catalog).map(\.kind),
+                       ["観測情報の対象沿岸", "到達予想・満潮の対象沿岸"])
     }
 }

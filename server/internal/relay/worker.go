@@ -47,8 +47,20 @@ func Payload(r model.Report, p model.Preferences) ([]byte, error) {
 		}
 		return s
 	}
+	title, alertBody := r.Title, r.Body
+	if !r.Cancelled && r.IsTsunamiObservation() {
+		if r.TelegramType == "VTSE51" {
+			title = "沿岸の津波観測に関する情報"
+			if r.InfoType == "訂正" {
+				title += "（訂正）"
+			}
+		}
+		if summary := r.TsunamiObservationSummary(p.TsunamiRegions); summary != "" {
+			alertBody = summary
+		}
+	}
 	payload := map[string]any{
-		"aps": map[string]any{"alert": map[string]string{"title": trim(r.Title, 120), "body": trim(r.Body, 600)},
+		"aps": map[string]any{"alert": map[string]string{"title": trim(title, 120), "body": trim(alertBody, 600)},
 			"sound": sound, "interruption-level": level, "thread-id": r.EventID},
 		"category": r.CategoryName(), "event_id": r.EventID, "report_id": r.ID, "server_sequence": r.ServerSequence, "eventId": r.EventID, "serial": r.Serial, "kind": r.Classification,
 		"cancel": r.Cancelled, "final": r.Final, "warning": r.Warning,
@@ -82,31 +94,52 @@ func (w *Worker) Step(ctx context.Context) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	following, err := w.Store.Followed(ctx, d.DeviceID, d.Report)
+	p := device.Preferences
+	if !device.Active || !device.PushActive || !p.NotificationsEnabled {
+		return finish("skipped", "device_or_preference_disabled", now)
+	}
+	var following bool
+	var releases []model.TsunamiArea
+	if d.Report.TelegramType == "VTSE41" && !d.Report.Cancelled {
+		releases, err = w.Store.FollowedTsunamiReleases(ctx, d.DeviceID, d.Report, p.TsunamiRegions)
+	} else if d.Report.EndsNotificationLifecycle() {
+		following, err = w.Store.Followed(ctx, d.DeviceID, d.Report)
+	}
 	if err != nil {
 		return true, err
 	}
-	if !device.Active || !device.PushActive || !device.Preferences.Allows(d.Report, following) {
+	allowed := p.Allows(d.Report, following) && tsunamiWarningMatches(d.Report, p)
+	if !allowed && len(releases) == 0 {
 		return finish("skipped", "device_or_preference_disabled", now)
 	}
 	stale, err := w.Store.Superseded(ctx, d.Report, d.Attempts > 1)
 	if err != nil {
 		return true, err
 	}
-	if stale {
+	if stale && len(releases) == 0 {
 		return finish("skipped", "superseded", now)
 	}
-	started, err := w.liveStart(ctx, *d, device, now)
-	if started {
+	if allowed && !stale {
+		if d.Report.TelegramType == "VTSE41" && d.Report.Warning && !d.Report.Cancelled {
+			d.TsunamiWarningAreas = d.Report.TsunamiWarningAreas(p.TsunamiRegions)
+		}
+		started, err := w.liveStart(ctx, *d, device, releases, now)
 		if err != nil {
 			return true, err
 		}
-		return finish("accepted", "live_activity_start", now)
+		if started {
+			return finish("accepted", "live_activity_start", now)
+		}
 	}
-	if err != nil {
-		return true, err
+	report := d.Report
+	if len(releases) > 0 {
+		if !report.Warning || !allowed || stale {
+			report = tsunamiReleaseAlert(report, releases)
+		} else {
+			report.Body = tsunamiReleaseText(releases) + " " + report.Body
+		}
 	}
-	body, err := Payload(d.Report, device.Preferences)
+	body, err := Payload(report, p)
 	if err != nil {
 		return finish("failed", "invalid_payload", now)
 	}

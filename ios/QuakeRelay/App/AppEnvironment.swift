@@ -119,7 +119,8 @@ final class AppEnvironment: ObservableObject {
             let bound = self.repository.serverIdentity == (try? self.api.serverIdentity())
             return try? WatchSnapshotBuilder.make(context: self.modelContainer.mainContext,
                 paired: self.isPaired && bound, lastSyncAt: self.repository.lastSyncAt,
-                receiverSummary: receiver.label, now: now)
+                receiverSummary: receiver.label, tsunamiRegions: RegionSelection.parse(self.settings.tsunamiRegionsText),
+                now: now)
         }
         watch.onSyncRequested = { [weak self] in
             guard let self, self.isPaired else { return }
@@ -229,6 +230,7 @@ final class AppEnvironment: ObservableObject {
         do {
             _ = try await api.updatePreferences(settings.devicePreferences)
             settings.expandedPreferencesSaved()
+            watch.publish()
             await liveActivities.configure(enabled: settings.notificationsEnabled && settings.liveActivitiesEnabled, paired: true)
             return true
         } catch {

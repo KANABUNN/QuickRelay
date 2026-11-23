@@ -35,17 +35,35 @@ struct EventDetailView: View {
         TimelineView(.periodic(from: .now, by: 15)) { context in
             Group {
                 if let event = events.first {
+                    let continuation = EventContinuationIndex(reports: allReports).status(for: event, now: context.date)
+                    let publication = tsunamiPublication
+                    let showsActiveWarning = publication.map {
+                        continuation.reportIDs.contains($0.report.id) && !$0.warnings.isEmpty
+                    } == true
+                    let observations = tsunamiObservations
                     ScrollViewReader { proxy in
                         List {
-                            latestSection(event, now: context.date)
+                            if let publication {
+                                tsunamiWarningSection(publication, isActive: showsActiveWarning,
+                                                      isHistorical: continuation.state == .history)
+                            }
+                            ForEach(observations, id: \.kind.title) { group in
+                                TsunamiObservationSection(group: group, highlighted: group.report.id == highlightedReportID)
+                            }
+                            latestSection(event, continuation: continuation, showsActiveWarning: showsActiveWarning)
                             if let latestReport {
                                 ReportChangesView(report: latestReport, previous: ReportComparison.previous(to: latestReport, in: reports))
                             }
                             if event.isWarningProduct && !event.isCancelled { forecastReferenceSection }
                             if let latestReport, let bulletin = latestReport.bulletin {
-                                Section("発表内容") { BulletinContent(bulletin: bulletin, reportID: latestReport.id) }
+                                let summarized = observations.filter { $0.report.id == latestReport.id }
+                                    .flatMap { $0.observations.map(\.section) }
+                                Section("発表内容") {
+                                    BulletinContent(bulletin: bulletin, reportID: latestReport.id,
+                                                    summarizedSections: summarized)
+                                }
                             }
-                            timelineSection(now: context.date)
+                            timelineSection(continuation: continuation)
                         }
                         .onAppear { scrollToHighlightedReport(using: proxy) }
                         .onChange(of: reports.count) { _, _ in
@@ -61,7 +79,7 @@ struct EventDetailView: View {
                 }
             }
         }
-        .navigationTitle(events.first?.displayTitle ?? "情報の詳細")
+        .navigationTitle(tsunamiPublication?.report.title ?? events.first?.displayTitle ?? "情報の詳細")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -94,10 +112,27 @@ struct EventDetailView: View {
     }
 
     @ViewBuilder
-    private func latestSection(_ event: EventEntity, now: Date) -> some View {
-        let continuation = EventContinuationIndex(reports: allReports).status(for: event, now: now)
+    private func tsunamiWarningSection(_ publication: TsunamiPublication, isActive: Bool, isHistorical: Bool) -> some View {
+        if isActive {
+            Section("発表中") {
+                TsunamiWarningSummary(publication: publication)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("detailOngoing")
+            }
+        } else if let status = publication.status {
+            Section(isHistorical ? "過去の警報・注意報" : "警報・注意報の発表") {
+                Label(status, systemImage: publication.report.isCancelled ? "xmark.octagon" : "water.waves")
+                    .font(.subheadline.bold()).foregroundStyle(publication.report.isCancelled ? .orange : .blue)
+                LabeledContent("発表時刻", value: (publication.report.occurredAt ?? publication.report.receivedAt)
+                    .formatted(date: .abbreviated, time: .standard))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func latestSection(_ event: EventEntity, continuation: EventContinuation, showsActiveWarning: Bool) -> some View {
         Section("最新状態") {
-            if continuation.isOngoing {
+            if continuation.isOngoing && !showsActiveWarning {
                 Label("継続中", systemImage: "dot.radiowaves.left.and.right")
                     .font(.headline).foregroundStyle(.orange)
                     .accessibilityIdentifier("detailOngoing")
@@ -110,12 +145,6 @@ struct EventDetailView: View {
             }
             LabeledContent("種別", value: RelayEventType(rawValue: event.eventType)?.displayName ?? event.eventType)
             LabeledContent("発表時刻", value: event.latestReportAt.formatted(date: .abbreviated, time: .standard))
-            if event.category == "tsunami", let report = TsunamiPublication.latest(in: reports, eventID: eventID),
-               let status = TsunamiPublication(report: report).status {
-                Label(status, systemImage: report.isCancelled ? "xmark.octagon" : "water.waves")
-                    .font(.subheadline.bold()).foregroundStyle(report.isCancelled ? .orange : .blue)
-                LabeledContent("警報・注意報の発表時刻", value: (report.occurredAt ?? report.receivedAt).formatted(date: .abbreviated, time: .standard))
-            }
             HypocenterFields(value: event.numericHypocenter, showMagnitudeAndDepth: !event.isWarningProduct)
             if let intensity = event.maxIntensity {
                 LabeledContent(event.intensityLabel, value: intensity)
@@ -131,7 +160,8 @@ struct EventDetailView: View {
                 }
             }
             if event.isCancelled {
-                Label("この情報は取り消されました", systemImage: "xmark.octagon.fill")
+                Label(event.category == "tsunami" ? "最新の電文は取り消されました" : "この情報は取り消されました",
+                      systemImage: "xmark.octagon.fill")
                     .foregroundStyle(.orange)
             } else if event.isEEW && event.isFinal {
                 Label("最終報", systemImage: "checkmark.circle.fill")
@@ -165,9 +195,8 @@ struct EventDetailView: View {
         }
     }
 
-    private func timelineSection(now: Date) -> some View {
-        let continuation = events.first.map { EventContinuationIndex(reports: allReports).status(for: $0, now: now) }
-        return Section("発表履歴") {
+    private func timelineSection(continuation: EventContinuation) -> some View {
+        Section("発表履歴") {
             if reports.isEmpty {
                 Text("発表履歴はまだ同期されていません。")
                     .foregroundStyle(.secondary)
@@ -176,12 +205,25 @@ struct EventDetailView: View {
                     ReportTimelineRow(
                         report: report,
                         highlighted: report.id == highlightedReportID,
-                        ongoing: continuation?.reportIDs.contains(report.id) == true
+                        ongoing: continuation.reportIDs.contains(report.id)
                     )
                     .id(report.id)
                 }
             }
         }
+    }
+
+    private var tsunamiPublication: TsunamiPublication? {
+        guard events.first?.category == "tsunami",
+              let report = TsunamiPublication.latest(in: reports, eventID: eventID) else { return nil }
+        return TsunamiPublication(report: report)
+    }
+
+    private var tsunamiObservations: [TsunamiObservation.Group] {
+        guard events.first?.category == "tsunami" else { return [] }
+        let groups = TsunamiObservation.groups(in: reports)
+        guard let highlightedReportID else { return groups }
+        return groups.filter { $0.report.id == highlightedReportID } + groups.filter { $0.report.id != highlightedReportID }
     }
 
     private var sortedReports: [ReportEntity] {
@@ -200,9 +242,42 @@ struct EventDetailView: View {
 
     private func scrollToHighlightedReport(using proxy: ScrollViewProxy) {
         guard let highlightedReportID else { return }
+        if let publication = tsunamiPublication, publication.report.id == highlightedReportID, publication.status != nil {
+            return
+        }
+        if tsunamiObservations.contains(where: { $0.report.id == highlightedReportID }) { return }
         DispatchQueue.main.async {
             withAnimation { proxy.scrollTo(highlightedReportID, anchor: .center) }
         }
+    }
+}
+
+private struct TsunamiObservationSection: View {
+    let group: TsunamiObservation.Group
+    let highlighted: Bool
+
+    var body: some View {
+        Section(group.kind.title) {
+            LabeledContent("発表時刻", value: (group.report.occurredAt ?? group.report.receivedAt)
+                .formatted(date: .abbreviated, time: .standard))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(Array(group.observations.prefix(3).enumerated()), id: \.offset) { _, observation in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(observation.name).font(.subheadline.bold())
+                    if let first = observation.firstWave { LabeledContent("第1波", value: first) }
+                    if let maximum = observation.maximumWave { LabeledContent("最大波", value: maximum) }
+                }
+                .font(.subheadline)
+            }
+            DisclosureGroup(group.kind == .estimate ? "推定の詳細（\(group.observations.count)予報区）"
+                                                    : "観測の詳細（\(group.observations.count)地点）") {
+                ForEach(Array(group.observations.enumerated()), id: \.offset) { _, observation in
+                    BulletinSectionContent(section: observation.section)
+                }
+            }
+        }
+        .listRowBackground(highlighted ? Color.accentColor.opacity(0.10) : nil)
     }
 }
 
@@ -291,6 +366,7 @@ private struct SourceFile: FileDocument {
 private struct BulletinContent: View {
     let bulletin: BulletinDTO
     let reportID: String
+    var summarizedSections: [BulletinSectionDTO] = []
     @EnvironmentObject private var repository: EventRepository
     @State private var file: SourceFile?
     @State private var exporting = false
@@ -299,8 +375,9 @@ private struct BulletinContent: View {
     @State private var showingIntensityObservations = false
 
     var body: some View {
-        let sections = Array((bulletin.sections ?? []).enumerated())
+        let sections = (bulletin.sections ?? []).enumerated().filter { !summarizedSections.contains($0.element) }
         let observations = sections.filter { $0.element.isIntensityObservation }
+        let forecasts = sections.filter { $0.element.isTsunamiForecastArea }
         return VStack(alignment: .leading, spacing: 12) {
             if let headline = bulletin.headline, !headline.isEmpty {
                 Text(headline).font(.subheadline).textSelection(.enabled)
@@ -317,8 +394,15 @@ private struct BulletinContent: View {
                         .buttonStyle(.borderless)
                         .accessibilityIdentifier("intensityObservations")
                     }
-                } else {
-                    sectionContent(section)
+                } else if !section.isTsunamiForecastArea {
+                    BulletinSectionContent(section: section)
+                }
+            }
+            if !forecasts.isEmpty {
+                DisclosureGroup("津波予報区の詳細（\(forecasts.count)予報区）") {
+                    ForEach(forecasts, id: \.offset) { _, section in
+                        BulletinSectionContent(section: section)
+                    }
                 }
             }
             if let document = bulletin.document {
@@ -353,8 +437,12 @@ private struct BulletinContent: View {
                 .presentationDragIndicator(.visible)
         }
     }
+}
 
-    private func sectionContent(_ section: BulletinSectionDTO) -> some View {
+private struct BulletinSectionContent: View {
+    let section: BulletinSectionDTO
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(section.title).font(.subheadline.bold())
             if let text = section.text { Text(text).textSelection(.enabled) }
@@ -366,6 +454,8 @@ private struct BulletinContent: View {
 }
 
 private extension BulletinSectionDTO {
+    var isTsunamiForecastArea: Bool { title.hasPrefix("津波予報区：") }
+
     var isIntensityObservation: Bool {
         title.hasPrefix("観測") && rows?.contains {
             $0.label == "震度" || $0.label == "最大震度"

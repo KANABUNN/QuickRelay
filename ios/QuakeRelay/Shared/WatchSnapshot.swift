@@ -16,10 +16,27 @@ struct WatchEventSnapshot: Codable, Equatable, Identifiable, Sendable {
     var isOngoing: Bool
     var ongoingReason: String?
     var ongoingUntil: Date? = nil
+    var tsunamiWarning: WatchTsunamiWarning? = nil
+    var tsunamiObservations: [WatchTsunamiObservation]? = nil
 
     func isOngoing(at date: Date) -> Bool {
         isOngoing && (ongoingUntil.map { date < $0 } ?? true)
     }
+}
+
+struct WatchTsunamiWarning: Codable, Equatable, Sendable {
+    var title: String
+    var scope: String
+    var issuedAt: Date
+}
+
+struct WatchTsunamiObservation: Codable, Equatable, Identifiable, Sendable {
+    var id: String { source }
+    var source: String
+    var name: String
+    var issuedAt: Date
+    var firstWave: String?
+    var maximumWave: String?
 }
 
 // Only display data crosses WatchConnectivity; credentials stay on the iPhone.

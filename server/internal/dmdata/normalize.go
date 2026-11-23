@@ -287,8 +287,11 @@ func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time
 			r.Title = c.Title
 		}
 		r.Bulletin = describeBulletin(e, body, c.Headline)
-		if e.Head.Type == "VTSE41" && tsunamiAlert(body) {
-			r.EventType, r.Warning = "tsunami_warning", true
+		if e.Head.Type == "VTSE41" {
+			r.TsunamiAreas = tsunamiForecastAreas(body)
+			if len(r.TsunamiWarningAreas(nil)) > 0 {
+				r.EventType, r.Warning = "tsunami_warning", true
+			}
 		}
 		if e.Head.Type == "VYSE50" {
 			r.Warning = nankaiAlert(body)

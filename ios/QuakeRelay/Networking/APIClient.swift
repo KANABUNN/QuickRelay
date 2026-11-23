@@ -132,7 +132,8 @@ final class APIClient {
             earthquakeRegions: preferences.earthquakeRegions ?? [],
             tsunamiRegions: preferences.tsunamiRegions ?? [],
             minimumIntensity: preferences.minimumIntensity ?? "",
-            liveActivitiesEnabled: preferences.liveActivitiesEnabled ?? false
+            liveActivitiesEnabled: preferences.liveActivitiesEnabled ?? false,
+            tsunamiObservationsEnabled: preferences.tsunamiObservationsEnabled
         )
         let body = try encoder.encode(patch)
         return try await request(

@@ -36,6 +36,9 @@ final class AppSettings: ObservableObject {
     @Published var tsunamiObservationsEnabled: Bool {
         didSet { defaults.set(tsunamiObservationsEnabled, forKey: "settings.tsunamiObservations") }
     }
+    @Published var tsunamiForecastEnabled: Bool {
+        didSet { defaults.set(tsunamiForecastEnabled, forKey: "settings.tsunamiForecast") }
+    }
     @Published var nankaiEnabled: Bool {
         didSet { defaults.set(nankaiEnabled, forKey: "settings.nankai") }
     }
@@ -99,7 +102,9 @@ final class AppSettings: ObservableObject {
         eewForecastEnabled = defaults.object(forKey: "settings.eewForecast") as? Bool ?? true
         eewWarningEnabled = defaults.object(forKey: "settings.eewWarning") as? Bool ?? true
         tsunamiWarningEnabled = defaults.object(forKey: "settings.tsunamiWarning") as? Bool ?? true
-        tsunamiObservationsEnabled = defaults.object(forKey: "settings.tsunamiObservations") as? Bool ?? true
+        let legacyTsunamiInfo = defaults.object(forKey: "settings.tsunamiObservations") as? Bool ?? true
+        tsunamiObservationsEnabled = legacyTsunamiInfo
+        tsunamiForecastEnabled = defaults.object(forKey: "settings.tsunamiForecast") as? Bool ?? legacyTsunamiInfo
         nankaiEnabled = defaults.object(forKey: "settings.nankai") as? Bool ?? true
         seismicAdvisoryEnabled = defaults.object(forKey: "settings.seismicAdvisory") as? Bool ?? true
         liveActivitiesEnabled = defaults.object(forKey: "settings.liveActivities") as? Bool ?? false
@@ -114,7 +119,8 @@ final class AppSettings: ObservableObject {
             earthquakeRegions: RegionSelection.parse(earthquakeRegionsText),
             tsunamiRegions: RegionSelection.parse(tsunamiRegionsText),
             minimumIntensity: minimumIntensity,
-            liveActivitiesEnabled: liveActivitiesEnabled
+            liveActivitiesEnabled: liveActivitiesEnabled,
+            tsunamiObservationsEnabled: tsunamiNotificationsEnabled && tsunamiObservationsEnabled
         )
     }
 
@@ -131,7 +137,7 @@ final class AppSettings: ObservableObject {
         }
         if tsunamiNotificationsEnabled {
             if tsunamiWarningEnabled { types += [.tsunamiWarning] }
-            if tsunamiObservationsEnabled { types += [.tsunamiInfo] }
+            if tsunamiForecastEnabled { types += [.tsunamiInfo] }
         }
         if advisoryNotificationsEnabled {
             if nankaiEnabled { types += [.nankaiInfo] }
@@ -153,12 +159,11 @@ final class AppSettings: ObservableObject {
         eewWarningEnabled = types.contains("eew_warning")
         if !needsExpandedPreferences {
             tsunamiWarningEnabled = types.contains("tsunami_warning")
-            tsunamiObservationsEnabled = types.contains("tsunami_info")
+            tsunamiForecastEnabled = types.contains("tsunami_info")
+            tsunamiObservationsEnabled = preferences.tsunamiObservationsEnabled ?? types.contains("tsunami_info")
+            tsunamiNotificationsEnabled = tsunamiWarningEnabled || tsunamiForecastEnabled || tsunamiObservationsEnabled
             nankaiEnabled = types.contains("nankai_info")
             seismicAdvisoryEnabled = !types.isDisjoint(with: ["seismic_advisory", "earthquake_data"])
-        }
-        if !needsExpandedPreferences {
-            tsunamiNotificationsEnabled = !types.isDisjoint(with: ["tsunami_warning", "tsunami_info"])
             advisoryNotificationsEnabled = !types.isDisjoint(with: ["nankai_info", "seismic_advisory", "earthquake_data"])
         }
         earthquakeNotificationsEnabled = !types.isDisjoint(with: [

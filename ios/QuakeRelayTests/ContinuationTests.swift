@@ -372,6 +372,104 @@ final class ContinuationTests: XCTestCase {
         XCTAssertTrue(snapshot.isPaired)
     }
 
+    func testWatchBuilderKeepsActiveWarningAboveNewerObservationDetails() throws {
+        let container = try PersistenceController.makeContainer(inMemory: true)
+        let context = container.mainContext
+        let tsunami = event("watch-tsunami", category: "tsunami")
+        tsunami.latestRevision = 4
+        context.insert(tsunami)
+        context.insert(report("warning", eventID: tsunami.id, sequence: 1, type: "VTSE41", category: "tsunami",
+            sections: [area("注意報の沿岸", kind: "津波注意報"), area("警報の沿岸", kind: "津波警報")]))
+
+        let first = "10/17 11:46 JST / 引き"
+        let maximum = "10/17 11:58 JST / 1.2m以上 / 上昇中"
+        context.insert(report("coast", eventID: tsunami.id, sequence: 2, type: "VTSE51", category: "tsunami",
+            occurredAt: "2026-10-17T03:00:10Z", sections: [
+                BulletinSectionDTO(title: "津波観測：欠測の港", rows: [BulletinRowDTO(label: "最大波", value: "欠測")]),
+                BulletinSectionDTO(title: "津波観測：大船渡", rows: [
+                    BulletinRowDTO(label: "地域", value: "岩手県"),
+                    BulletinRowDTO(label: "第1波", value: first),
+                    BulletinRowDTO(label: "最大波", value: maximum)
+                ]),
+                BulletinSectionDTO(title: "津波観測：石巻市鮎川", rows: [
+                    BulletinRowDTO(label: "地域", value: "宮城県"),
+                    BulletinRowDTO(label: "最大波", value: "10/17 11:57 JST / 0.7m")
+                ])
+            ]))
+        context.insert(report("offshore", eventID: tsunami.id, sequence: 3, type: "VTSE52", category: "tsunami",
+            occurredAt: "2026-10-17T03:00:20Z", sections: [
+                BulletinSectionDTO(title: "津波観測：沖合の観測点A", rows: [
+                    BulletinRowDTO(label: "最大波", value: "10/17 11:57 JST / 90cm")
+                ]),
+                BulletinSectionDTO(title: "津波観測：沖合の観測点B", rows: [
+                    BulletinRowDTO(label: "最大波", value: "10/17 11:56 JST / 1.8m")
+                ]),
+                BulletinSectionDTO(title: "沿岸の推定：警報の沿岸", rows: [
+                    BulletinRowDTO(label: "第1波の推定", value: "早いところでは既に津波到達と推定")
+                ]),
+                BulletinSectionDTO(title: "沿岸の推定：宮城県", rows: [
+                    BulletinRowDTO(label: "最大波の推定", value: "不明")
+                ])
+            ]))
+        context.insert(report("tide", eventID: tsunami.id, sequence: 4, type: "VTSE51", category: "tsunami",
+            occurredAt: "2026-10-17T03:00:25Z", sections: [area("警報の沿岸", kind: "津波警報")]))
+        try context.save()
+
+        let snapshot = try WatchSnapshotBuilder.make(context: context, paired: true,
+            lastSyncAt: now, receiverSummary: nil, now: now)
+        let event = try XCTUnwrap(snapshot.events.first)
+        XCTAssertTrue(event.isOngoing(at: now))
+        XCTAssertEqual(event.tsunamiWarning?.title, "津波警報")
+        XCTAssertEqual(event.tsunamiWarning?.scope, "警報の沿岸")
+        XCTAssertEqual(event.tsunamiWarning?.issuedAt, ServerDateParser.parse("2026-10-17T03:00:00Z"))
+        let observations = try XCTUnwrap(event.tsunamiObservations)
+        XCTAssertEqual(observations.map(\.source), ["沿岸で観測", "沖合で観測", "沿岸での推定"])
+        XCTAssertEqual(observations.map(\.name), ["大船渡", "沖合の観測点B", "警報の沿岸"])
+        XCTAssertEqual(observations.map(\.firstWave), [first, nil, "早いところでは既に津波到達と推定"])
+        XCTAssertEqual(observations.map(\.maximumWave), [maximum, "10/17 11:56 JST / 1.8m", nil])
+        XCTAssertEqual(try WatchSnapshot.decode(snapshot.encoded()), snapshot)
+
+        let local = try WatchSnapshotBuilder.make(context: context, paired: true,
+            lastSyncAt: now, receiverSummary: nil, tsunamiRegions: ["宮城県"], now: now)
+        XCTAssertEqual(local.events.first?.tsunamiWarning, event.tsunamiWarning)
+        XCTAssertEqual(local.events.first?.tsunamiObservations?.map(\.name), ["石巻市鮎川", "沖合の観測点B", "宮城県"])
+        let unmatched = try WatchSnapshotBuilder.make(context: context, paired: true,
+            lastSyncAt: now, receiverSummary: nil, tsunamiRegions: ["遠方の沿岸"], now: now)
+        XCTAssertEqual(unmatched.events.first?.tsunamiObservations, observations)
+    }
+
+    func testTsunamiObservationHighlightsRisingWavesAndExplicitUpdates() {
+        let coastal = report("coastal-observations", sequence: 1, type: "VTSE51", category: "tsunami", sections: [
+            BulletinSectionDTO(title: "津波観測：従来の最大波", rows: [
+                BulletinRowDTO(label: "最大波", value: "10/17 11:55 JST / 2.0m / 更新予定")
+            ]),
+            BulletinSectionDTO(title: "津波観測：第1波の追加", rows: [
+                BulletinRowDTO(label: "第1波", value: "10/17 11:57 JST / 引き / 追加")
+            ]),
+            BulletinSectionDTO(title: "津波観測：最大波の更新", rows: [
+                BulletinRowDTO(label: "最大波", value: "10/17 11:58 JST / 0.7m / 更新")
+            ]),
+            BulletinSectionDTO(title: "津波観測：最大波が上昇中", rows: [
+                BulletinRowDTO(label: "最大波", value: "10/17 11:59 JST / 0.5m以上 / 上昇中")
+            ])
+        ])
+        let ranked = TsunamiObservation.groups(in: [coastal]).first?.observations.map(\.name)
+        XCTAssertEqual(ranked, ["最大波が上昇中", "最大波の更新", "第1波の追加", "従来の最大波"])
+    }
+
+    func testTsunamiObservationCancellationSuppressesOnlyItsProduct() {
+        let coast = report("coast", sequence: 1, type: "VTSE51", category: "tsunami", sections: [
+            BulletinSectionDTO(title: "津波観測：港", rows: [BulletinRowDTO(label: "最大波", value: "観測中")])
+        ])
+        let offshore = report("offshore", sequence: 2, type: "VTSE52", category: "tsunami", sections: [
+            BulletinSectionDTO(title: "津波観測：沖合", rows: [BulletinRowDTO(label: "最大波", value: "1.2m")])
+        ])
+        let cancelled = report("cancelled", sequence: 3, type: "VTSE51", category: "tsunami", cancelled: true)
+        let groups = TsunamiObservation.groups(in: [cancelled, offshore, coast])
+        XCTAssertEqual(groups.map(\.kind), [.offshore])
+        XCTAssertEqual(groups.first?.observations.first?.maximumWave, "1.2m")
+    }
+
     func testWatchBuilderBoundsEncodedDataWhileRetainingOngoingAndRecentBothCategories() throws {
         let container = try PersistenceController.makeContainer(inMemory: true)
         let context = container.mainContext

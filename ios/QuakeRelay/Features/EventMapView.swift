@@ -123,10 +123,11 @@ struct EventMapView: View {
         }
     }
     private func coastColor(_ kind: String) -> Color {
-        if kind == "大津波警報" { return .purple }
-        if kind == "津波警報" { return .red }
-        if kind == "津波注意報" { return .orange }
-        if kind.contains("解除") { return .gray }
-        return .blue
+        switch TsunamiPublication.WarningLevel(kind: kind) {
+        case .major: .purple
+        case .warning: .red
+        case .advisory: .orange
+        case nil: kind.contains("解除") ? .gray : .blue
+        }
     }
 }

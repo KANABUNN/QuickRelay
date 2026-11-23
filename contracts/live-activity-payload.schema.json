@@ -65,6 +65,9 @@
             "category": {
               "type": "string"
             },
+            "detailEventID": {
+              "type": "string"
+            },
             "warning": {
               "type": "boolean"
             },

@@ -41,7 +41,12 @@ func (p Preferences) Allows(r Report, following bool) bool {
 	if following && r.EndsNotificationLifecycle() {
 		return true
 	}
-	if !slices.Contains(p.EventTypes, r.EventType) {
+	enabled := slices.Contains(p.EventTypes, r.EventType)
+	observation := r.IsTsunamiObservation()
+	if observation && p.TsunamiObservationsEnabled != nil {
+		enabled = *p.TsunamiObservationsEnabled
+	}
+	if !enabled {
 		return false
 	}
 	selected := p.EarthquakeRegions
@@ -53,14 +58,22 @@ func (p Preferences) Allows(r Report, following bool) bool {
 	if r.MaxIntensity != nil {
 		intensity = *r.MaxIntensity
 	}
-	if applies && len(selected) > 0 && len(r.AffectedAreas) > 0 {
+	areas := r.AffectedAreas
+	if observation && r.TelegramType == "VTSE51" && len(selected) > 0 {
+		// VTSE51 can also list forecasts for many regions with no observation.
+		// Use only the observation regions to decide who receives an observed wave.
+		areas = nil
+		for _, station := range r.tsunamiWaveSummaries() {
+			if station.area != "" {
+				areas = append(areas, AffectedArea{Name: station.area})
+			}
+		}
+	}
+	if applies && len(selected) > 0 && len(areas) > 0 {
 		matches := []AffectedArea{}
-		for _, area := range r.AffectedAreas {
-			for _, name := range selected {
-				if area.Name == name || strings.HasPrefix(area.Name, name) {
-					matches = append(matches, area)
-					break
-				}
+		for _, area := range areas {
+			if matchesRegion(area.Name, selected) {
+				matches = append(matches, area)
 			}
 		}
 		if len(matches) == 0 {
@@ -94,4 +107,8 @@ func (p Preferences) Allows(r Report, following bool) bool {
 		}
 	}
 	return true
+}
+
+func matchesRegion(area string, selected []string) bool {
+	return slices.ContainsFunc(selected, func(name string) bool { return strings.HasPrefix(area, name) })
 }

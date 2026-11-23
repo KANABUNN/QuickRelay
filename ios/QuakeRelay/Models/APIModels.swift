@@ -182,6 +182,7 @@ struct DevicePreferences: Codable, Equatable, Sendable {
     var tsunamiRegions: [String]? = nil
     var minimumIntensity: String? = nil
     var liveActivitiesEnabled: Bool? = nil
+    var tsunamiObservationsEnabled: Bool? = nil
 }
 
 struct DeviceRegistrationRequest: Encodable, Sendable {
@@ -219,6 +220,7 @@ struct PreferencesPatchRequest: Encodable, Sendable {
     var tsunamiRegions: [String]? = nil
     var minimumIntensity: String? = nil
     var liveActivitiesEnabled: Bool? = nil
+    var tsunamiObservationsEnabled: Bool? = nil
 }
 
 struct PreferencesResponse: Codable, Equatable, Sendable {
