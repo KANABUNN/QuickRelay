@@ -64,6 +64,7 @@ type Report struct {
 	ValidUntil     *time.Time      `json:"valid_until,omitempty"`
 	Bulletin       *Bulletin       `json:"bulletin,omitempty"`
 	AffectedAreas  []AffectedArea  `json:"affected_areas,omitempty"`
+	TsunamiAreas   []TsunamiArea   `json:"tsunami_areas,omitempty"`
 	Raw            json.RawMessage `json:"-"`
 }
 

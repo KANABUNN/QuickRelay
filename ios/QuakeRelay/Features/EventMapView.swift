@@ -49,8 +49,7 @@ struct EventMapView: View {
                         }
                         ForEach(observations.points) { point in
                             Annotation(point.name, coordinate: point.coordinate) {
-                                Text(point.intensity).font(.caption.bold()).padding(5)
-                                    .foregroundStyle(.white).background(intensityColor(point.intensity), in: RoundedRectangle(cornerRadius: 5))
+                                IntensityBadge(reading: IntensityReading(point.intensity), size: 26)
                                     .accessibilityLabel("\(point.name) 観測震度\(point.intensity)")
                             }
                         }
@@ -114,19 +113,12 @@ struct EventMapView: View {
             }
         }
     }
-    private func intensityColor(_ value: String) -> Color {
-        switch IntensityValue.rank(value) ?? 0 {
-        case 7...: .red
-        case 5...6: .orange
-        case 4: .brown
-        default: .blue
-        }
-    }
     private func coastColor(_ kind: String) -> Color {
-        if kind == "大津波警報" { return .purple }
-        if kind == "津波警報" { return .red }
-        if kind == "津波注意報" { return .orange }
-        if kind.contains("解除") { return .gray }
-        return .blue
+        switch TsunamiPublication.WarningLevel(kind: kind) {
+        case .major: .purple
+        case .warning: .red
+        case .advisory: .orange
+        case nil: kind.contains("解除") ? .gray : .blue
+        }
     }
 }

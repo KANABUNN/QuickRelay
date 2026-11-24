@@ -111,6 +111,7 @@ final class ReportEntity {
     var bulletinData: Data? = nil
     var pressTime: Date? = nil
     var validUntil: Date? = nil
+    var affectedAreasData: Data? = nil
 
     init(dto: ReportDTO, serverSequence: Int64) {
         id = dto.id
@@ -135,6 +136,7 @@ final class ReportEntity {
         bulletinData = dto.bulletin.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
         pressTime = ServerDateParser.parse(dto.pressTime)
         validUntil = ServerDateParser.parse(dto.validUntil)
+        affectedAreasData = dto.affectedAreas.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
     }
 
     func update(from dto: ReportDTO, serverSequence: Int64) {
@@ -159,6 +161,7 @@ final class ReportEntity {
         bulletinData = dto.bulletin.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
         pressTime = ServerDateParser.parse(dto.pressTime)
         validUntil = ServerDateParser.parse(dto.validUntil)
+        affectedAreasData = dto.affectedAreas.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
     }
 
     var isEEW: Bool { RelayEventType(rawValue: eventType)?.isEEW == true }
@@ -170,6 +173,11 @@ final class ReportEntity {
     var numericHypocenter: HypocenterDTO? {
         guard let hypocenterData else { return nil }
         return try? JSONDecoder.quakeRelay.decode(HypocenterDTO.self, from: hypocenterData)
+    }
+    /// Reports synced before this field existed return nil; values are never inferred.
+    var affectedAreas: [AffectedAreaDTO]? {
+        guard let affectedAreasData else { return nil }
+        return try? JSONDecoder.quakeRelay.decode([AffectedAreaDTO].self, from: affectedAreasData)
     }
 }
 

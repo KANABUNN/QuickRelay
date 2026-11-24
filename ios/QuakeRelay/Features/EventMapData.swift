@@ -103,11 +103,14 @@ enum MapDataBuilder {
     }
     static func coasts(_ report: ReportEntity, catalog: CoastCatalog) -> [CoastMapArea] {
         guard !report.isCancelled else { return [] }
-        var result: [CoastMapArea] = []
-        for area in TsunamiPublication(report: report).areas {
-            guard let region = catalog.regions.first(where: { nameKey($0.name) == nameKey(area.name) }) else { continue }
-            result.append(CoastMapArea(region: region, kind: area.kind, height: area.height))
+        let forecastAreas = TsunamiPublication(report: report).areas.compactMap { area -> CoastMapArea? in
+            guard let region = catalog.regions.first(where: { nameKey($0.name) == nameKey(area.name) }) else { return nil }
+            let kind = report.telegramType == "VTSE41" ? area.kind : "到達予想・満潮の対象沿岸"
+            return CoastMapArea(region: region, kind: kind, height: area.height)
         }
+        if report.telegramType == "VTSE41" { return forecastAreas }
+
+        var result: [CoastMapArea] = []
         // Observation/estimation products identify a coast, not a gauge position.
         // Draw the coast and label the basis instead of inventing a station marker.
         for section in report.bulletin?.sections ?? [] {
@@ -122,6 +125,7 @@ enum MapDataBuilder {
                   !result.contains(where: { $0.id == region.code }) else { continue }
             result.append(CoastMapArea(region: region, kind: kind, height: nil))
         }
-        return result
+        let observed = Set(result.map(\.id))
+        return result + forecastAreas.filter { !observed.contains($0.id) }
     }
 }

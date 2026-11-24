@@ -20,6 +20,7 @@ type LiveContent struct {
 	IntensityText string `json:"intensityText"`
 	ReportLabel   string `json:"reportLabel"`
 	Category      string `json:"category"`
+	DetailEventID string `json:"detailEventID,omitempty"`
 	Warning       bool   `json:"warning"`
 	EEWWarning    bool   `json:"eewWarning,omitempty"`
 	Ended         bool   `json:"ended"`
@@ -38,6 +39,9 @@ func liveText(s string, n int) string {
 func liveContent(r model.Report, now time.Time, end bool, forced bool) LiveContent {
 	state := LiveContent{Title: liveText(r.Title, 80), Summary: liveText(r.Body, 220), Category: r.CategoryName(),
 		Warning: r.Warning, Ended: end, Cancelled: r.Cancelled, ReportedAt: r.ReportedAt.Unix(), UpdatedAt: now.Unix()}
+	if r.TelegramType == "VTSE41" {
+		state.DetailEventID = r.EventID
+	}
 	state.EEWWarning = r.TelegramType == "VXSE43" && !end && !r.Cancelled && !r.Final && now.Before(r.LiveActivityDeadline())
 	state.StatusText = "続報を待機"
 	state.ReportLabel = "発表"
@@ -58,7 +62,7 @@ func liveContent(r model.Report, now time.Time, end bool, forced bool) LiveConte
 	case r.IsEEW() && r.Final:
 		state.StatusText = "受信終了（最終報）"
 	case r.TelegramType == "VTSE41" && !r.Warning:
-		state.StatusText = "この発表に警報・注意報なし"
+		state.StatusText = "対象地域に警報・注意報なし"
 	case end:
 		state.StatusText = "表示を終了"
 	case r.TelegramType == "VTSE41":
@@ -109,7 +113,7 @@ func LivePayload(r model.Report, p model.Preferences, event string, now time.Tim
 	return b, err
 }
 
-func (w *Worker) liveStart(ctx context.Context, d store.Delivery, device model.Device, now time.Time) (bool, error) {
+func (w *Worker) liveStart(ctx context.Context, d store.Delivery, device model.Device, releases []model.TsunamiArea, now time.Time) (bool, error) {
 	if !device.Preferences.LiveActivitiesEnabled {
 		return false, nil
 	}
@@ -124,7 +128,14 @@ func (w *Worker) liveStart(ctx context.Context, d store.Delivery, device model.D
 	if err != nil || token == "" {
 		return false, err
 	}
-	body, err := LivePayload(d.Report, device.Preferences, "start", now, false)
+	report := d.Report
+	if report.TelegramType == "VTSE41" {
+		report, _ = tsunamiLiveDisplay(report, device.Preferences)
+		if len(releases) > 0 {
+			report.Body = tsunamiReleaseText(releases) + " " + report.Body
+		}
+	}
+	body, err := LivePayload(report, device.Preferences, "start", now, false)
 	if err != nil {
 		// An optional widget payload must not prevent the ordinary alert.
 		return false, w.Store.FinishLiveStart(ctx, d.DeviceID, d.Report, token, false, false, now)
@@ -172,7 +183,7 @@ func (w *Worker) LiveStep(ctx context.Context) (bool, error) {
 		return true, w.Store.FinishLiveJob(ctx, *job, status, reason, next, ended, timestamp)
 	}
 	key := job.Report.LiveActivityKey()
-	live, err := w.Store.LiveActivity(ctx, job.DeviceID, job.Report.EventID, key)
+	live, err := w.Store.LiveActivity(ctx, job.DeviceID, job.EventID, key)
 	if errors.Is(err, store.ErrNotFound) {
 		return finish("skipped", "not_started", now, false, 0)
 	}
@@ -192,7 +203,8 @@ func (w *Worker) LiveStep(ctx context.Context) (bool, error) {
 	end := forced || !device.Active || !device.PushActive || !device.Preferences.LiveActivitiesEnabled || !device.Preferences.NotificationsEnabled
 	job.Revision = job.Report.ServerSequence
 	if !forced {
-		if key == "VXSE45" {
+		switch key {
+		case "VXSE45":
 			forecast, warning, err := w.Store.EEWLiveReports(ctx, job.Report.EventID)
 			if err != nil {
 				return true, err
@@ -201,15 +213,15 @@ func (w *Worker) LiveStep(ctx context.Context) (bool, error) {
 			report, complete = eewLiveDisplay(forecast, warning, device.Preferences, now)
 			end = end || complete
 			job.Revision = max(forecast.ServerSequence, warning.ServerSequence)
-		} else {
-			latest, err := w.Store.Stream(ctx, job.Report.EventID, job.Report.TelegramType)
+		case "VTSE41":
+			latest, err := w.Store.LatestTsunamiReport(ctx)
 			if err != nil {
 				return true, err
 			}
-			if latest.ServerSequence > job.Report.ServerSequence {
-				return finish("skipped", "superseded", now, false, 0)
-			}
-			end = end || !device.Preferences.Allows(report, true) || report.EndsNotificationLifecycle()
+			var complete bool
+			report, complete = tsunamiLiveDisplay(latest, device.Preferences)
+			end = end || complete
+			job.Revision = latest.ServerSequence
 		}
 	}
 	if !end && job.Revision <= live.LastSequence {

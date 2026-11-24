@@ -1,14 +1,15 @@
 package model
 
 type Preferences struct {
-	NotificationsEnabled  bool     `json:"notifications_enabled"`
-	TimeSensitiveEnabled  bool     `json:"time_sensitive_enabled"`
-	CustomSoundEnabled    bool     `json:"custom_sound_enabled"`
-	EventTypes            []string `json:"event_types"`
-	EarthquakeRegions     []string `json:"earthquake_regions,omitempty"`
-	TsunamiRegions        []string `json:"tsunami_regions,omitempty"`
-	MinimumIntensity      string   `json:"minimum_intensity,omitempty"`
-	LiveActivitiesEnabled bool     `json:"live_activities_enabled"`
+	NotificationsEnabled       bool     `json:"notifications_enabled"`
+	TimeSensitiveEnabled       bool     `json:"time_sensitive_enabled"`
+	CustomSoundEnabled         bool     `json:"custom_sound_enabled"`
+	EventTypes                 []string `json:"event_types"`
+	EarthquakeRegions          []string `json:"earthquake_regions,omitempty"`
+	TsunamiRegions             []string `json:"tsunami_regions,omitempty"`
+	TsunamiObservationsEnabled *bool    `json:"tsunami_observations_enabled,omitempty"`
+	MinimumIntensity           string   `json:"minimum_intensity,omitempty"`
+	LiveActivitiesEnabled      bool     `json:"live_activities_enabled"`
 }
 
 func DefaultPreferences() Preferences {

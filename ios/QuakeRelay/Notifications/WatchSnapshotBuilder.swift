@@ -7,7 +7,8 @@ enum WatchSnapshotBuilder {
     static let byteBudget = 48_000
     static let historyPerCategory = 15
 
-    static func make(context: ModelContext, paired: Bool, lastSyncAt: Date?, receiverSummary: String?, now: Date = Date()) throws -> WatchSnapshot {
+    static func make(context: ModelContext, paired: Bool, lastSyncAt: Date?, receiverSummary: String?,
+                     tsunamiRegions: [String] = [], now: Date = Date()) throws -> WatchSnapshot {
         guard paired else {
             return WatchSnapshot(generatedAt: now, lastSyncAt: nil,
                 receiverSummary: nil, events: [], isPaired: false)
@@ -31,12 +32,21 @@ enum WatchSnapshotBuilder {
             let publication = tsunami.flatMap { TsunamiPublication(report: $0).status } ?? event.publicationLabel
             let stateText = continuation.state == .unknown ? "継続状況未確認" :
                 continuation.state == .ended ? continuation.explanation : publication
+            let observations = TsunamiObservation.groups(in: eventReports).compactMap { group -> WatchTsunamiObservation? in
+                guard let point = observationPoint(for: group, regions: tsunamiRegions) else { return nil }
+                return WatchTsunamiObservation(source: group.kind.title, name: String(point.name.prefix(45)),
+                    issuedAt: group.report.pressTime ?? group.report.occurredAt ?? group.report.receivedAt,
+                    firstWave: point.firstWave.map { String($0.prefix(96)) },
+                    maximumWave: point.maximumWave.map { String($0.prefix(96)) })
+            }
             selected.append(WatchEventSnapshot(id: event.id, category: WatchEventCategory(rawValue: event.category)!,
                 title: String((event.category == "earthquake" ? event.numericHypocenter.epicenter ?? event.displayTitle : event.displayTitle).prefix(80)),
                 summary: String((latestReport?.body ?? "").prefix(240)), occurredAt: event.originTime,
                 updatedAt: event.latestReportAt, publicationStatus: String(stateText.prefix(120)),
                 isOngoing: continuation.isOngoing, ongoingReason: String(continuation.explanation.prefix(160)),
-                ongoingUntil: continuation.until))
+                ongoingUntil: continuation.until, tsunamiWarning: activeReport.flatMap(warningSummary),
+                tsunamiObservations: observations.isEmpty ? nil : observations,
+                detail: detail(for: event, reports: eventReports, continuation: continuation)))
         }
         var snapshot = WatchSnapshot(generatedAt: now, lastSyncAt: lastSyncAt,
             receiverSummary: receiverSummary, events: selected)
@@ -57,11 +67,100 @@ enum WatchSnapshotBuilder {
                 snapshot.events[i].summary = ""
                 snapshot.events[i].ongoingReason = nil
                 snapshot.events[i].title = String(snapshot.events[i].title.prefix(40))
+                snapshot.events[i].detail?.areas = nil
+                snapshot.events[i].detail?.comment = nil
+                if !snapshot.events[i].isOngoing { snapshot.events[i].detail?.tsunamiLevels = nil }
             }
         }
         guard try snapshot.encoded().count <= byteBudget else {
             throw CocoaError(.fileWriteOutOfSpace)
         }
         return snapshot
+    }
+
+    static let areaLimit = 8
+    static let tsunamiAreaLimit = 12
+
+    /// Structured values shown by the Watch. Warning M/depth stay hidden.
+    static func detail(for event: EventEntity, reports: [ReportEntity], continuation: EventContinuation) -> WatchEventDetail? {
+        func clip(_ value: String?, _ length: Int) -> String? { value.map { String($0.prefix(length)) } }
+        switch event.category {
+        case "earthquake":
+            let summary = EarthquakeEventSummary(reports: reports)
+            let hypocenter = summary.hypocenterReport?.numericHypocenter
+            let warningOnly = summary.hypocenterReport.map { $0.isEEW && EEWStream($0) == .warning } ?? false
+            let observed = summary.observedMax
+            let forecast = summary.forecastMax
+            var detail = WatchEventDetail()
+            let typeName: String = RelayEventType(rawValue: event.eventType)?.displayName ?? event.displayTitle
+            let kindLabel: String = event.isEEW
+                ? typeName + " " + event.publicationLabel
+                : event.displayTitle + " · " + event.publicationLabel
+            detail.kindLabel = clip(kindLabel, 60)
+            detail.intensity = (observed ?? forecast)?.displayText
+            detail.intensityIsForecast = observed == nil && forecast != nil ? true : nil
+            detail.originTime = ServerDateParser.parse(hypocenter?.originTime)
+            if !warningOnly {
+                detail.magnitude = ValueText.magnitude(hypocenter).map { hypocenter?.isAssumed == true ? $0 + "（仮定）" : $0 }
+                detail.depth = hypocenter?.depthText
+            }
+            detail.hypocenterNote = clip(hypocenter?.qualification, 80)
+            if let warning = summary.warningReport, !warning.isCancelled, continuation.reportIDs.contains(warning.id) {
+                detail.isEEWWarning = true
+            }
+            if let report = summary.commentReport {
+                detail.comment = clip(BulletinLayout(bulletin: report.bulletin).text(.warningComment), 120)
+            }
+            if let report = summary.observedReport {
+                let tree = IntensityObservationTree(sections: BulletinLayout(bulletin: report.bulletin).intensitySections)
+                let nodes = tree.groups(atDepth: tree.summaryDepth).flatMap(\.nodes)
+                let areas = nodes.prefix(areaLimit).compactMap { node in
+                    node.intensity.map { WatchAreaIntensity(name: String(node.name.prefix(24)), intensity: $0.displayText) }
+                }
+                detail.areas = areas.isEmpty ? nil : areas
+            } else if let forecastReport = summary.forecastReport, !forecastReport.isCancelled {
+                let areas = EEWPresentation.forecastAreas(forecastReport).prefix(areaLimit).compactMap { area in
+                    IntensityReading(area.maxIntensity).map { WatchAreaIntensity(name: String(area.name.prefix(24)), intensity: $0.displayText) }
+                }
+                detail.areas = areas.isEmpty ? nil : areas
+            }
+            return detail
+        case "tsunami":
+            var detail = WatchEventDetail()
+            guard let latest = TsunamiPublication.latest(in: reports, eventID: event.id) else { return nil }
+            detail.kindLabel = clip(latest.title + " · " + latest.publicationLabel, 60)
+            guard !latest.isCancelled else { return detail }
+            let levels = TsunamiForecastGroup.groups(latest).map { group in
+                WatchTsunamiLevel(title: group.title,
+                    areas: group.entries.prefix(tsunamiAreaLimit).map {
+                        WatchTsunamiArea(name: String($0.name.prefix(24)), height: clip($0.maxHeight, 24))
+                    },
+                    remaining: group.entries.count > tsunamiAreaLimit ? group.entries.count - tsunamiAreaLimit : nil)
+            }
+            detail.tsunamiLevels = levels.isEmpty ? nil : levels
+            return detail
+        default:
+            return nil
+        }
+    }
+
+    private static func warningSummary(_ report: ReportEntity) -> WatchTsunamiWarning? {
+        guard let highest = TsunamiPublication(report: report).warnings.first else { return nil }
+        let names = highest.areas.prefix(2).map { String($0.name.prefix(30)) }.joined(separator: "、")
+        let remaining = highest.areas.count - 2
+        let scope = remaining > 0 ? "\(names) ほか\(remaining)予報区" : names
+        return WatchTsunamiWarning(title: highest.level.title, scope: scope,
+            issuedAt: report.pressTime ?? report.occurredAt ?? report.receivedAt)
+    }
+
+    private static func observationPoint(for group: TsunamiObservation.Group, regions: [String]) -> TsunamiObservation? {
+        let points = group.observations.filter { $0.firstWave != nil || $0.maximumWave != nil }
+        guard group.kind != .offshore, !regions.isEmpty else { return points.first }
+        let local = points.first { point in
+            let area = group.kind == .estimate ? point.name : point.section.rows?.first { $0.label == "地域" }?.value
+            guard let area else { return false }
+            return regions.contains { !$0.isEmpty && area.hasPrefix($0) }
+        }
+        return local ?? points.first
     }
 }

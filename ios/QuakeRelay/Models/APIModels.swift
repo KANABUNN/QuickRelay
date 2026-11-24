@@ -123,6 +123,8 @@ struct ReportDTO: Codable, Equatable, Sendable {
     var bulletin: BulletinDTO? = nil
     var pressTime: String? = nil
     var validUntil: String? = nil
+    // Region names with their maximum (EEW: forecast) intensity, as normalized by the VPS.
+    var affectedAreas: [AffectedAreaDTO]? = nil
 
     var numericHypocenter: HypocenterDTO? {
         if let hypocenter { return hypocenter }
@@ -131,6 +133,11 @@ struct ReportDTO: Codable, Equatable, Sendable {
         return HypocenterDTO(status: "estimated", originTime: originTime, epicenter: epicenter,
                              latitude: latitude, longitude: longitude, depthKm: depthKm, magnitude: magnitude)
     }
+}
+
+struct AffectedAreaDTO: Codable, Equatable, Sendable {
+    var name: String
+    var maxIntensity: String? = nil
 }
 
 struct SyncItemDTO: Codable, Equatable, Sendable {
@@ -182,6 +189,7 @@ struct DevicePreferences: Codable, Equatable, Sendable {
     var tsunamiRegions: [String]? = nil
     var minimumIntensity: String? = nil
     var liveActivitiesEnabled: Bool? = nil
+    var tsunamiObservationsEnabled: Bool? = nil
 }
 
 struct DeviceRegistrationRequest: Encodable, Sendable {
@@ -219,6 +227,7 @@ struct PreferencesPatchRequest: Encodable, Sendable {
     var tsunamiRegions: [String]? = nil
     var minimumIntensity: String? = nil
     var liveActivitiesEnabled: Bool? = nil
+    var tsunamiObservationsEnabled: Bool? = nil
 }
 
 struct PreferencesResponse: Codable, Equatable, Sendable {

@@ -67,6 +67,9 @@ final class NotificationsUITests: XCTestCase {
         guard app.tabBars.buttons["津波"].waitForExistence(timeout: 15) else {
             XCTFail("Loopback pairing did not complete"); return
         }
+        // The overview tab opens first; the history assertions start on the earthquake tab.
+        XCTAssertTrue(app.tabBars.buttons["概況"].exists)
+        app.tabBars.buttons["地震"].tap()
         assertListTitle("地震", in: app)
         try await action("capture/earthquake-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         let search = app.searchFields.firstMatch
@@ -131,11 +134,13 @@ final class NotificationsUITests: XCTestCase {
         assertListTitle("津波", in: app)
         XCTAssertTrue(app.staticTexts["発表中"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["継続中"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["大津波警報"].firstMatch.exists)
         try await action("capture/tsunami-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         let tsunami = app.staticTexts["合成津波警報"].firstMatch
         XCTAssertTrue(tsunami.waitForExistence(timeout: 10))
         tsunami.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "detailOngoing").firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["大津波警報"].firstMatch.exists)
         // LabeledContent exposes the displayed value with its label or accessibility value.
         let height = app.descendants(matching: .any).matching(
             NSPredicate(format: "label CONTAINS %@ OR value == %@", "巨大", "巨大")

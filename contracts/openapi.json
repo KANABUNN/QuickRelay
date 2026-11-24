@@ -431,6 +431,10 @@
                       "maxLength": 60
                     }
                   },
+                  "tsunami_observations_enabled": {
+                    "type": "boolean",
+                    "description": "Controls tsunami observation notifications independently of the tsunami_info event type."
+                  },
                   "minimum_intensity": {
                     "enum": [
                       "",

@@ -31,21 +31,31 @@ struct ReceiverStatusView: View {
             let state = ReceiverState.resolve(status: environment.receiverStatus,
                 checkedAt: environment.receiverStatusCheckedAt,
                 failed: environment.receiverStatusError != nil, now: context.date)
-            VStack(alignment: .leading, spacing: 4) {
-                Label(state.label, systemImage: state == .healthy ? "checkmark.circle" : "exclamationmark.circle")
-                    .font(.subheadline.weight(.semibold))
+            let timing = timingText
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Label(state.label, systemImage: state == .healthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(state == .healthy ? Color.green : Color.orange)
+                    .lineLimit(1)
                     .accessibilityIdentifier("receiverStatus")
-                HStack {
-                    Text("接続の確認 \(environment.receiverStatusCheckedAt?.formatted(date: .omitted, time: .standard) ?? "未実行")")
-                    Spacer()
-                    Text("履歴の同期 \(repository.lastSyncAt?.formatted(date: .omitted, time: .shortened) ?? "未実行")")
-                }
-                .font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                Text(timing)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.horizontal).padding(.vertical, 8)
+            .padding(.horizontal).padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.thinMaterial, ignoresSafeAreaEdges: [])
         }
+    }
+
+    private var timingText: String {
+        var checked = "未実行"
+        if let date = environment.receiverStatusCheckedAt { checked = DisplayTime.time(date) }
+        var synced = "未実行"
+        if let date = repository.lastSyncAt { synced = DisplayTime.time(date) }
+        return "確認 \(checked) · 同期 \(synced)"
     }
 }

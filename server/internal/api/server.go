@@ -171,14 +171,15 @@ func (s *Server) revoke(w http.ResponseWriter, r *http.Request, id string) {
 }
 func (s *Server) preferences(w http.ResponseWriter, r *http.Request, id string) {
 	var p struct {
-		NotificationsEnabled  *bool     `json:"notifications_enabled"`
-		TimeSensitiveEnabled  *bool     `json:"time_sensitive_enabled"`
-		CustomSoundEnabled    *bool     `json:"custom_sound_enabled"`
-		EventTypes            *[]string `json:"event_types"`
-		EarthquakeRegions     *[]string `json:"earthquake_regions"`
-		TsunamiRegions        *[]string `json:"tsunami_regions"`
-		MinimumIntensity      *string   `json:"minimum_intensity"`
-		LiveActivitiesEnabled *bool     `json:"live_activities_enabled"`
+		NotificationsEnabled       *bool     `json:"notifications_enabled"`
+		TimeSensitiveEnabled       *bool     `json:"time_sensitive_enabled"`
+		CustomSoundEnabled         *bool     `json:"custom_sound_enabled"`
+		EventTypes                 *[]string `json:"event_types"`
+		EarthquakeRegions          *[]string `json:"earthquake_regions"`
+		TsunamiRegions             *[]string `json:"tsunami_regions"`
+		TsunamiObservationsEnabled *bool     `json:"tsunami_observations_enabled"`
+		MinimumIntensity           *string   `json:"minimum_intensity"`
+		LiveActivitiesEnabled      *bool     `json:"live_activities_enabled"`
 	}
 	if err := decode(w, r, &p); err != nil {
 		fail(w, err)
@@ -206,6 +207,9 @@ func (s *Server) preferences(w http.ResponseWriter, r *http.Request, id string) 
 	}
 	if p.TsunamiRegions != nil {
 		d.Preferences.TsunamiRegions = *p.TsunamiRegions
+	}
+	if p.TsunamiObservationsEnabled != nil {
+		d.Preferences.TsunamiObservationsEnabled = p.TsunamiObservationsEnabled
 	}
 	if p.MinimumIntensity != nil {
 		d.Preferences.MinimumIntensity = *p.MinimumIntensity

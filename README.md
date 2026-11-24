@@ -18,7 +18,7 @@ DMDATAの地震情報をGoサーバーで受信し、APNs経由で本人のiOS�
 
 [構成](docs/architecture.md) / [API](docs/api.md) / [通知仕様](docs/event-semantics.md) / [対象電文](docs/initial-release-scope.md)
 
-受信状態の表示、地域・震度・種別の通知設定、自分の端末への通知テスト、EEW予報と津波警報・注意報のLive Activityに対応します。[通知とLive Activity](docs/notification-usability.md)を参照してください。
+受信状態の表示、地域・震度・種別の通知設定、自分の端末への通知テスト、EEW予報と津波警報・注意報のLive Activityに対応します。[通知とLive Activity](docs/notification-usability.md)を参照してください。画面構成は[iOS・Apple Watch・Live Activityの画面](docs/ios-ui.md)、サーバー解析の改善候補は[改善候補](docs/server-parsing-improvements.md)にまとめています。
 
 ## 開発・検証
 

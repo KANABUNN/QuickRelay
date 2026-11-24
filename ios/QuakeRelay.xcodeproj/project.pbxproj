@@ -82,6 +82,16 @@
 		64F78495B5000CF61F5EFF20 /* Watch Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD4018CB42BAEC63A572AC78; };
 		4FF3623A928E71BF42378358 /* Watch PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CEF7D43B2AB0EBAF3F7D60DF; };
 		194E3092EEEF2250544603D5 /* QuickRelayWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 97E22960C945FAF79D7DC0B4; settings = {ATTRIBUTES = (RemoveHeadersOnCopy,);}; };
+		AD90BF6120308818FFA8CBA9 /* SeismicScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A49DD04209173BF9091BD93 /* SeismicScale.swift */; };
+		68A2E9517139350AD2BA76DB /* ReportPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 638FBB1C10B82B4B46039A1E /* ReportPresentation.swift */; };
+		4C78D22BD712AF604F02C328 /* DetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4632CB02E493E8F5360963 /* DetailComponents.swift */; };
+		DFB95811C33BA2DCDD927B0D /* EarthquakeDetailSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F639FB9CFB57F5DFA67117 /* EarthquakeDetailSections.swift */; };
+		A54A4CC18D6C56884B46131F /* TsunamiAdvisorySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044169242F1A22123014CE7F /* TsunamiAdvisorySections.swift */; };
+		8B47D4BA350FE622253E117E /* ReportTimelineSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3A2DBB8BEEB3264144448C /* ReportTimelineSections.swift */; };
+		720617C7C038D40B9BB78EB1 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E92DCD132EA7EBFC572ACD0 /* OverviewView.swift */; };
+		8FB98A96B78560204D5DFDE7 /* SeismicScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A49DD04209173BF9091BD93 /* SeismicScale.swift */; };
+		14CD2E666165D4BF2ECEBE7E /* SeismicScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A49DD04209173BF9091BD93 /* SeismicScale.swift */; };
+		EDBBDF99E9D5A1DADB347C8F /* PresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E7CE74BA62A1222B0EF02B7 /* PresentationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -179,6 +189,14 @@
 		CEF7D43B2AB0EBAF3F7D60DF /* Watch PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = "Resources/PrivacyInfo.xcprivacy"; sourceTree = "<group>"; };
 		9066B148EC28ABC99331CCE8 /* Watch Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Resources/Info.plist"; sourceTree = "<group>"; };
 		97E22960C945FAF79D7DC0B4 /* QuickRelayWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuickRelayWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A49DD04209173BF9091BD93 /* SeismicScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/SeismicScale.swift"; sourceTree = "<group>"; };
+		638FBB1C10B82B4B46039A1E /* ReportPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReportPresentation.swift"; sourceTree = "<group>"; };
+		1E4632CB02E493E8F5360963 /* DetailComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/DetailComponents.swift"; sourceTree = "<group>"; };
+		49F639FB9CFB57F5DFA67117 /* EarthquakeDetailSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/EarthquakeDetailSections.swift"; sourceTree = "<group>"; };
+		044169242F1A22123014CE7F /* TsunamiAdvisorySections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/TsunamiAdvisorySections.swift"; sourceTree = "<group>"; };
+		9D3A2DBB8BEEB3264144448C /* ReportTimelineSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReportTimelineSections.swift"; sourceTree = "<group>"; };
+		8E92DCD132EA7EBFC572ACD0 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/OverviewView.swift"; sourceTree = "<group>"; };
+		9E7CE74BA62A1222B0EF02B7 /* PresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PresentationTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -249,6 +267,13 @@
 				14BAD606E63B7EB83164A763 /* EventMapData.swift */,
 				8C3954598910C522F72618FE /* ReportChangesView.swift */,
 				EC0B1C9FDC92D1088A923C13 /* ReportChanges.swift */,
+				1A49DD04209173BF9091BD93 /* SeismicScale.swift */,
+				638FBB1C10B82B4B46039A1E /* ReportPresentation.swift */,
+				1E4632CB02E493E8F5360963 /* DetailComponents.swift */,
+				49F639FB9CFB57F5DFA67117 /* EarthquakeDetailSections.swift */,
+				044169242F1A22123014CE7F /* TsunamiAdvisorySections.swift */,
+				9D3A2DBB8BEEB3264144448C /* ReportTimelineSections.swift */,
+				8E92DCD132EA7EBFC572ACD0 /* OverviewView.swift */,
 				81AA2C53681B69F6C0FAC358 /* HistoryFilterView.swift */,
 				3B5CC04B6DD0FD1D4D703D30 /* HistoryPreferences.swift */,
 				F57CE9B9137E00B704A7728D /* LiveActivityCoordinator.swift */,
@@ -287,6 +312,7 @@
 			isa = PBXGroup;
 			children = (
 				EA527D8EDC444F47DC685D0F /* ContinuationTests.swift */,
+				9E7CE74BA62A1222B0EF02B7 /* PresentationTests.swift */,
 				4A6CFBDD407067E004D1CE6D /* MediumFeaturesTests.swift */,
 				AD6DD0FDDA7D9E3620CB1A07 /* live-activity.valid.json */,
 				3EBA60FE3E4BC09BEB197076 /* PriorityFeaturesTests.swift */,
@@ -524,6 +550,13 @@
 				E550DAE5302B0E0E4119397A /* EventMapData.swift in Sources */,
 				0E8B0CAF2A3AE61DE6EE03A0 /* ReportChangesView.swift in Sources */,
 				0D4C76786284BC024C60D06F /* ReportChanges.swift in Sources */,
+				AD90BF6120308818FFA8CBA9 /* SeismicScale.swift in Sources */,
+				68A2E9517139350AD2BA76DB /* ReportPresentation.swift in Sources */,
+				4C78D22BD712AF604F02C328 /* DetailComponents.swift in Sources */,
+				DFB95811C33BA2DCDD927B0D /* EarthquakeDetailSections.swift in Sources */,
+				A54A4CC18D6C56884B46131F /* TsunamiAdvisorySections.swift in Sources */,
+				8B47D4BA350FE622253E117E /* ReportTimelineSections.swift in Sources */,
+				720617C7C038D40B9BB78EB1 /* OverviewView.swift in Sources */,
 				D619C9C82D59365014220CA2 /* HistoryFilterView.swift in Sources */,
 				DAEF00C44C355DF106F9764A /* HistoryPreferences.swift in Sources */,
 				FAA1A194B2262E7098E06B4C /* LiveActivityCoordinator.swift in Sources */,
@@ -558,6 +591,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				95C55715ABA9E026C1C18884 /* ContinuationTests.swift in Sources */,
+				EDBBDF99E9D5A1DADB347C8F /* PresentationTests.swift in Sources */,
 				E5C3D756463A4B4C8726C314 /* MediumFeaturesTests.swift in Sources */,
 				875739E64A611F9D613C93AC /* PriorityFeaturesTests.swift in Sources */,
 				A00000000000000000000016 /* TestFixtures.swift in Sources */,
@@ -584,11 +618,12 @@
 
         EA1000000000000000000001 /* Sources */ = {
             isa=PBXSourcesBuildPhase;buildActionMask=2147483647;
-            files=(AA1000000000000000000001,AA1000000000000000000002,);runOnlyForDeploymentPostprocessing=0;
+            files=(AA1000000000000000000001,AA1000000000000000000002,14CD2E666165D4BF2ECEBE7E,);runOnlyForDeploymentPostprocessing=0;
         };
 		EC7547F475DB5BEA3D515029 /* Watch Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
 				8E40208D2BA4C547C35B2AEE /* WatchSnapshot.swift in Sources */,
 				27F3BB1AE453851EF1B1E8AF /* WatchEventViews.swift in Sources */,
+				8FB98A96B78560204D5DFDE7 /* SeismicScale.swift in Sources */,
 				914F9103DEA43A738C57BA43 /* WatchSnapshotStore.swift in Sources */,
 				3016D41825661B2C0B790BCC /* QuickRelayWatchApp.swift in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
