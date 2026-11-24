@@ -64,7 +64,8 @@ private struct EarthquakeHeaderSection: View {
         Section {
             HStack(alignment: .top, spacing: 14) {
                 IntensityBadge(reading: observed ?? forecast, size: 68,
-                               caption: observed != nil ? "最大震度" : forecast != nil ? "予想最大" : nil)
+                               caption: observed != nil ? "最大震度" : forecast != nil ? "予想最大" : nil,
+                               longPeriodText: summary.maxLongPeriodText)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(hypocenter?.epicenter ?? event.displayTitle)
                         .font(.title3.bold())

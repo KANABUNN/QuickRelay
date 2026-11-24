@@ -196,14 +196,37 @@ enum TsunamiKindStyle: Int, CaseIterable, Comparable, Sendable {
 }
 
 /// Square badge showing a seismic intensity class with the JMA colour.
+/// With `longPeriodText`, a strip below the square shows the long-period ground
+/// motion class (e.g. "階級 3") in its own colour.
 struct IntensityBadge: View {
     let reading: IntensityReading?
     var size: CGFloat = 44
     var caption: String? = nil
+    var longPeriodText: String? = nil
 
     var body: some View {
-        let level = reading?.dominant
+        let shape = RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
         VStack(spacing: 0) {
+            intensityFace
+            if let longPeriodText {
+                Rectangle()
+                    .fill(Color.black.opacity(0.18))
+                    .frame(width: size, height: 0.5)
+                longPeriodStrip(longPeriodText)
+            }
+        }
+        .frame(width: size)
+        .clipShape(shape)
+        .overlay {
+            shape.strokeBorder(Color.black.opacity(0.14), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var intensityFace: some View {
+        let level = reading?.dominant
+        return VStack(spacing: 0) {
             if let caption {
                 Text(caption)
                     .font(.system(size: max(8, size * 0.19), weight: .semibold))
@@ -225,14 +248,24 @@ struct IntensityBadge: View {
         .padding(.horizontal, 2)
         .foregroundStyle(level?.foreground ?? Color.primary)
         .frame(width: size, height: size)
-        .background(level?.fill ?? Color.gray.opacity(0.22),
-                    in: RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.14), lineWidth: 0.5)
+        .background(level?.fill ?? Color.gray.opacity(0.22))
+    }
+
+    private func longPeriodStrip(_ text: String) -> some View {
+        let level = LongPeriodClass(text)
+        return HStack(alignment: .firstTextBaseline, spacing: max(1, size * 0.05)) {
+            Text("階級")
+                .font(.system(size: max(7, size * 0.19), weight: .semibold))
+            Text(Self.longPeriodLabel(text))
+                .font(.system(size: max(9, size * 0.3), weight: .heavy, design: .rounded))
+                .monospacedDigit()
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .padding(.horizontal, 2)
+        .foregroundStyle(level?.foreground ?? Color.primary)
+        .frame(width: size, height: max(12, size * 0.36))
+        .background(level?.fill ?? Color.gray.opacity(0.22))
     }
 
     private var mainFontSize: CGFloat {
@@ -242,9 +275,22 @@ struct IntensityBadge: View {
     }
 
     private var accessibilityText: String {
-        let prefix = caption.map { $0 + " " } ?? ""
-        guard let reading else { return prefix + "震度の記載なし" }
-        return prefix + "震度" + reading.displayText
+        var text = caption.map { $0 + " " } ?? ""
+        if let reading {
+            text += "震度" + reading.displayText
+        } else {
+            text += "震度の記載なし"
+        }
+        if let longPeriodText {
+            text += "、長周期地震動階級" + Self.longPeriodLabel(longPeriodText)
+        }
+        return text
+    }
+
+    /// "3" for a known class; otherwise the published text unchanged.
+    private static func longPeriodLabel(_ text: String) -> String {
+        guard let level = LongPeriodClass(text) else { return text }
+        return String(level.rawValue)
     }
 }
 

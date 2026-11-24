@@ -99,6 +99,7 @@ enum WatchSnapshotBuilder {
             detail.kindLabel = clip(kindLabel, 60)
             detail.intensity = (observed ?? forecast)?.displayText
             detail.intensityIsForecast = observed == nil && forecast != nil ? true : nil
+            detail.longPeriodClass = clip(summary.maxLongPeriodText, 8)
             detail.originTime = ServerDateParser.parse(hypocenter?.originTime)
             if !warningOnly {
                 detail.magnitude = ValueText.magnitude(hypocenter).map { hypocenter?.isAssumed == true ? $0 + "（仮定）" : $0 }

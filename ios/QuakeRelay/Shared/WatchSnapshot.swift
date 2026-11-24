@@ -42,6 +42,8 @@ struct WatchEventDetail: Codable, Equatable, Sendable {
     var comment: String? = nil
     var areas: [WatchAreaIntensity]? = nil
     var tsunamiLevels: [WatchTsunamiLevel]? = nil
+    /// 最大長周期地震動階級 (長周期地震動に関する観測情報), as published.
+    var longPeriodClass: String? = nil
 }
 
 struct WatchAreaIntensity: Codable, Equatable, Identifiable, Sendable {
