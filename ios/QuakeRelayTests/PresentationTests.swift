@@ -136,6 +136,60 @@ final class PresentationTests: XCTestCase {
         XCTAssertEqual(summary.hypocenterReport?.id, "vxse61")
     }
 
+    func testListIntensityKeepsObservedValuesAfterLaterBulletins() throws {
+        // 震源・震度情報 → 長周期地震動に関する観測情報 → 震源要素更新, in publication order.
+        let observed = report("vxse53", sequence: 1, type: "VXSE53", maxIntensity: "5強",
+            hypocenter: HypocenterDTO(status: "estimated", epicenter: "合成震源", magnitude: 6.1),
+            sections: observationSections)
+        let longPeriod = report("vxse62", sequence: 2, type: "VXSE62", occurredAt: "2026-11-20T03:20:00Z",
+            maxIntensity: "5弱", sections: [BulletinSectionDTO(title: "長周期地震動",
+                rows: rows([("最大長周期地震動階級", "3"), ("長周期地震動の区分", "4")]))])
+        let update = report("vxse61", sequence: 3, type: "VXSE61", occurredAt: "2026-11-20T03:40:00Z",
+            hypocenter: HypocenterDTO(status: "estimated", epicenter: "合成震源", magnitude: 6.2))
+        // The event row mirrors the latest publication (VXSE61), which carries no intensity.
+        let event = EventEntity(dto: TestFixtures.event(eventType: "earthquake_update", maxIntensity: nil))
+
+        let summary = EarthquakeIntensitySummary(event: event, reports: [observed, longPeriod, update])
+        XCTAssertEqual(summary.display?.displayText, "5強", "震源・震度情報 stays the source after later bulletins")
+        XCTAssertFalse(summary.isForecast)
+        XCTAssertEqual(summary.longPeriodText, "3")
+        XCTAssertEqual(EarthquakeEventSummary(reports: [observed, longPeriod, update]).maxLongPeriodText, "3")
+        XCTAssertEqual(EarthquakeEventSummary(reports: [observed, longPeriod, update]).observedMax, summary.observed,
+                       "The list and the detail header use the same value")
+
+        var filter = HistoryFilter()
+        filter.minimumIntensity = "5強"
+        XCTAssertFalse(filter.matches(event, searchText: "", unread: false, pinned: false))
+        XCTAssertTrue(filter.matches(event, searchText: "", unread: false, pinned: false,
+                                     maxIntensity: summary.display?.text))
+
+        // Without 震源・震度情報, the long-period report's observed maximum is used.
+        XCTAssertEqual(EarthquakeIntensitySummary(reports: [longPeriod, update]).observed?.displayText, "5弱")
+        // A cancelled long-period report no longer shows its class.
+        let cancelled = report("vxse62-cancel", sequence: 4, type: "VXSE62", cancelled: true,
+                               occurredAt: "2026-11-20T03:50:00Z")
+        XCTAssertNil(EarthquakeIntensitySummary(reports: [observed, longPeriod, update, cancelled]).longPeriodText)
+    }
+
+    func testListIntensityUsesForecastOnlyUntilObserved() {
+        let forecast = report("f1", sequence: 1, type: "VXSE45", revision: 1, maxIntensity: "4")
+        let event = EventEntity(dto: TestFixtures.event(eventType: "eew_forecast", maxIntensity: "4"))
+        let summary = EarthquakeIntensitySummary(event: event, reports: [forecast])
+        XCTAssertEqual(summary.display?.displayText, "4")
+        XCTAssertTrue(summary.isForecast)
+        XCTAssertNil(summary.longPeriodText)
+
+        let observed = report("vxse51", sequence: 2, type: "VXSE51", occurredAt: "2026-11-20T03:02:00Z", maxIntensity: "3")
+        let later = EarthquakeIntensitySummary(event: event, reports: [forecast, observed])
+        XCTAssertEqual(later.display?.displayText, "3", "Observed values replace the forecast")
+        XCTAssertFalse(later.isForecast)
+
+        // An event whose reports are not stored locally keeps its own value.
+        let fallback = EarthquakeIntensitySummary(event: event, reports: [])
+        XCTAssertEqual(fallback.forecast?.displayText, "4")
+        XCTAssertNil(fallback.observed)
+    }
+
     func testEEWSummaryPrefersForecastValuesAndKeepsStreamsSeparate() {
         let forecast = report("f2", sequence: 2, type: "VXSE45", revision: 2, maxIntensity: "5弱",
             hypocenter: HypocenterDTO(status: "estimated", epicenter: "合成震源", depthKm: 30, magnitude: 5.8),
@@ -220,12 +274,15 @@ final class PresentationTests: XCTestCase {
             hypocenter: HypocenterDTO(status: "estimated", originTime: "2026-11-20T02:59:50Z",
                                       epicenter: "合成震源", depthKm: 10, magnitude: 4.1),
             sections: observationSections + [BulletinSectionDTO(title: "防災上の留意事項", text: "この地震による津波の心配はありません。")]))
+        context.insert(report("vxse62", sequence: 2, type: "VXSE62", occurredAt: "2026-11-20T03:00:20Z", maxIntensity: "4",
+            sections: [BulletinSectionDTO(title: "長周期地震動", rows: rows([("最大長周期地震動階級", "2")]))]))
         try context.save()
         let snapshot = try WatchSnapshotBuilder.make(context: context, paired: true, lastSyncAt: now,
                                                      receiverSummary: nil, now: now)
         let detail = try XCTUnwrap(snapshot.events.first?.detail)
         XCTAssertEqual(detail.intensity, "4")
         XCTAssertNil(detail.intensityIsForecast)
+        XCTAssertEqual(detail.longPeriodClass, "2")
         XCTAssertEqual(detail.magnitude, "M4.1")
         XCTAssertEqual(detail.depth, "10 km")
         XCTAssertEqual(detail.comment, "この地震による津波の心配はありません。")

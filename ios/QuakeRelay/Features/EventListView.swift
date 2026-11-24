@@ -18,9 +18,11 @@ struct EventListView: View {
     private var visibleEvents: [EventEntity] {
         let groups = groupedReports
         return categoryEvents.filter { event in
-            let searchable = searchText(for: event, reports: groups[event.id] ?? [])
+            let eventReports = groups[event.id] ?? []
+            let searchable = searchText(for: event, reports: eventReports)
             return filter.matches(event, searchText: searchable, unread: history.isUnread(event, scope: scope),
-                                  pinned: history.isPinned(event.id, scope: scope))
+                                  pinned: history.isPinned(event.id, scope: scope),
+                                  maxIntensity: filterIntensity(for: event, reports: eventReports))
         }.sorted {
             let a = history.isPinned($0.id, scope: scope), b = history.isPinned($1.id, scope: scope)
             if a != b { return a }
@@ -42,6 +44,11 @@ struct EventListView: View {
             }
         }
         return values.joined(separator: " ")
+    }
+    /// The same value as the row badge, so a later 震源要素更新 does not hide the event.
+    private func filterIntensity(for event: EventEntity, reports: [ReportEntity]) -> String? {
+        guard !filter.minimumIntensity.isEmpty, event.category == "earthquake" else { return event.maxIntensity }
+        return EarthquakeIntensitySummary(event: event, reports: reports).display?.text
     }
 
     @EnvironmentObject private var repository: EventRepository
@@ -181,7 +188,7 @@ struct EventRow: View {
         case "tsunami":
             TsunamiEventRow(event: event, reports: reports, unread: unread, pinned: pinned, continuation: continuation)
         case "earthquake":
-            EarthquakeEventRow(event: event, unread: unread, pinned: pinned, continuation: continuation)
+            EarthquakeEventRow(event: event, reports: reports, unread: unread, pinned: pinned, continuation: continuation)
         default:
             AdvisoryEventRow(event: event, reports: reports, unread: unread, pinned: pinned)
         }
@@ -204,15 +211,20 @@ private struct RowMarks: View {
 
 private struct EarthquakeEventRow: View {
     let event: EventEntity
+    let reports: [ReportEntity]
     let unread: Bool
     let pinned: Bool
     let continuation: EventContinuation
 
     var body: some View {
         let hypocenter = event.numericHypocenter
+        // From all reports of the earthquake: the event row mirrors only the latest
+        // publication, and 震源要素更新 (VXSE61) has no intensity.
+        let intensity = EarthquakeIntensitySummary(event: event, reports: reports)
         HStack(alignment: .top, spacing: 12) {
-            IntensityBadge(reading: IntensityReading(event.maxIntensity), size: 48,
-                           caption: event.isEEW ? "予想" : nil)
+            IntensityBadge(reading: intensity.display, size: 48,
+                           caption: intensity.isForecast ? "予想" : nil,
+                           longPeriodText: intensity.longPeriodText)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     RowMarks(unread: unread, pinned: pinned)

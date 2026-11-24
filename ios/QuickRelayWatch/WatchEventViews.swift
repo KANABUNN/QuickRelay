@@ -144,7 +144,8 @@ private struct WatchEarthquakeRow: View {
         let detail = event.detail
         HStack(alignment: .top, spacing: 8) {
             IntensityBadge(reading: IntensityReading(detail?.intensity), size: prominent ? 42 : 34,
-                           caption: detail?.intensityIsForecast == true ? "予想" : nil)
+                           caption: detail?.intensityIsForecast == true ? "予想" : nil,
+                           longPeriodText: detail?.longPeriodClass)
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.title)
                     .font(prominent ? .headline : .subheadline.weight(.semibold))
@@ -260,7 +261,8 @@ private struct WatchEarthquakeDetail: View {
         Section {
             HStack(alignment: .top, spacing: 8) {
                 IntensityBadge(reading: IntensityReading(detail?.intensity), size: 50,
-                               caption: detail?.intensityIsForecast == true ? "予想最大" : "最大震度")
+                               caption: detail?.intensityIsForecast == true ? "予想最大" : "最大震度",
+                               longPeriodText: detail?.longPeriodClass)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(event.title).font(.headline).lineLimit(3)
                     if let kind = detail?.kindLabel {

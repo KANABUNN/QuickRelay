@@ -393,17 +393,12 @@ struct EarthquakeEventSummary {
     let warningReport: ReportEntity?
 
     init(reports: [ReportEntity]) {
-        var latest: [String: ReportEntity] = [:]
-        for report in reports where !report.isEEW {
-            guard let type = report.telegramType else { continue }
-            if let current = latest[type], !ReportPublicationOrder.areInAscendingOrder(current, report) { continue }
-            latest[type] = report
-        }
+        let latest = Self.latestPublications(reports)
         latestByType = latest
         forecastReport = EEWPresentation.latest(.forecast, in: reports)
         warningReport = EEWPresentation.latest(.warning, in: reports)
 
-        func active(_ types: [String]) -> [ReportEntity] { types.compactMap { latest[$0] }.filter { !$0.isCancelled } }
+        func active(_ types: [String]) -> [ReportEntity] { Self.activeReports(types, in: latest) }
         let newest: ([ReportEntity]) -> ReportEntity? = { $0.max(by: ReportPublicationOrder.areInAscendingOrder) }
 
         let located = active(["VXSE61", "VXSE53", "VXSE52", "VXSE62"]).filter { report in
@@ -418,8 +413,7 @@ struct EarthquakeEventSummary {
             hypocenterReport = [forecastReport, warningReport].compactMap { $0 }
                 .first { !$0.isCancelled && $0.numericHypocenter != nil }
         }
-        observedReport = active(["VXSE53", "VXSE51"]).first { $0.maxIntensity != nil || !BulletinLayout(bulletin: $0.bulletin).intensitySections.isEmpty }
-            ?? active(["VXSE53", "VXSE51"]).first
+        observedReport = Self.selectObservedReport(in: latest)
         longPeriodReport = active(["VXSE62"]).first
         commentReport = newest(active(["VXSE53", "VXSE52", "VXSE51", "VXSE61", "VXSE62"]).filter {
             !BulletinLayout(bulletin: $0.bulletin).comments.isEmpty
@@ -430,18 +424,108 @@ struct EarthquakeEventSummary {
     var hypocenterIsFromEEW: Bool { hypocenterReport?.isEEW == true }
 
     var observedMax: IntensityReading? {
-        IntensityReading(observedReport?.maxIntensity ?? latestByType["VXSE62"].flatMap { $0.isCancelled ? nil : $0.maxIntensity })
+        Self.observedReading(observedReport: observedReport, latest: latestByType)
     }
 
     var forecastMax: IntensityReading? {
-        let live = [warningReport, forecastReport].compactMap { $0 }.filter { !$0.isCancelled }
+        Self.forecastReading([warningReport, forecastReport])
+    }
+
+    /// 最大長周期地震動階級 of the latest 長周期地震動に関する観測情報, as published.
+    var maxLongPeriodText: String? {
+        Self.longPeriodClassText(longPeriodReport)
+    }
+
+    // Selection rules shared with EarthquakeIntensitySummary (list rows), so the
+    // list and the detail header always show the same values.
+
+    /// Latest publication of each ordinary (non-EEW) telegram type, cancellations included.
+    static func latestPublications(_ reports: [ReportEntity]) -> [String: ReportEntity] {
+        var latest: [String: ReportEntity] = [:]
+        for report in reports where !report.isEEW {
+            guard let type = report.telegramType else { continue }
+            if let current = latest[type], !ReportPublicationOrder.areInAscendingOrder(current, report) { continue }
+            latest[type] = report
+        }
+        return latest
+    }
+
+    static func activeReports(_ types: [String], in latest: [String: ReportEntity]) -> [ReportEntity] {
+        types.compactMap { latest[$0] }.filter { !$0.isCancelled }
+    }
+
+    /// 震源・震度情報, else 震度速報. 震源要素更新 (VXSE61) carries no intensity.
+    static func selectObservedReport(in latest: [String: ReportEntity]) -> ReportEntity? {
+        let candidates = activeReports(["VXSE53", "VXSE51"], in: latest)
+        return candidates.first { $0.maxIntensity != nil || !BulletinLayout(bulletin: $0.bulletin).intensitySections.isEmpty }
+            ?? candidates.first
+    }
+
+    static func observedReading(observedReport: ReportEntity?, latest: [String: ReportEntity]) -> IntensityReading? {
+        IntensityReading(observedReport?.maxIntensity ?? activeReports(["VXSE62"], in: latest).first?.maxIntensity)
+    }
+
+    static func forecastReading(_ reports: [ReportEntity?]) -> IntensityReading? {
+        let live = reports.compactMap { $0 }.filter { !$0.isCancelled }
         return live.compactMap { IntensityReading($0.maxIntensity) }.max { IntensityReading.sortKey($0) < IntensityReading.sortKey($1) }
+    }
+
+    static func longPeriodClassText(_ report: ReportEntity?) -> String? {
+        guard let report, !report.isCancelled else { return nil }
+        let value = BulletinLayout(bulletin: report.bulletin).longPeriodRows
+            .first { $0.label == "最大長周期地震動階級" }?.value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return value?.isEmpty == false ? value : nil
     }
 
     /// Telegram types whose latest publication is a cancellation.
     var cancelledTypes: [String] {
         latestByType.filter { $0.value.isCancelled }.map(\.key).sorted()
     }
+}
+
+/// Strongest values of one earthquake for compact displays: list rows, statistics
+/// and the intensity filter. The event row only mirrors the latest publication, and
+/// a later 震源要素更新 (VXSE61) or 長周期地震動に関する観測情報 (VXSE62) replaces it,
+/// so the values are taken from all stored reports with the detail header's rules.
+/// Hypocentres and comments are not decoded here, to keep list rows light.
+struct EarthquakeIntensitySummary: Equatable {
+    /// Observed maximum: 震源・震度情報, else 震度速報, else 長周期地震動に関する観測情報.
+    var observed: IntensityReading?
+    /// Forecast maximum of the live EEW streams.
+    var forecast: IntensityReading?
+    /// 最大長周期地震動階級 (observed), as published.
+    var longPeriodText: String?
+
+    init(observed: IntensityReading?, forecast: IntensityReading?, longPeriodText: String?) {
+        self.observed = observed
+        self.forecast = forecast
+        self.longPeriodText = longPeriodText
+    }
+
+    init(reports: [ReportEntity]) {
+        let latest = EarthquakeEventSummary.latestPublications(reports)
+        observed = EarthquakeEventSummary.observedReading(
+            observedReport: EarthquakeEventSummary.selectObservedReport(in: latest), latest: latest)
+        forecast = EarthquakeEventSummary.forecastReading([
+            EEWPresentation.latest(.warning, in: reports), EEWPresentation.latest(.forecast, in: reports),
+        ])
+        longPeriodText = EarthquakeEventSummary.longPeriodClassText(latest["VXSE62"])
+    }
+
+    /// Uses the event's own value only when none of its reports are stored locally.
+    init(event: EventEntity, reports: [ReportEntity]) {
+        guard reports.isEmpty else {
+            self.init(reports: reports)
+            return
+        }
+        let reading = event.isCancelled ? nil : IntensityReading(event.maxIntensity)
+        self.init(observed: event.isEEW ? nil : reading, forecast: event.isEEW ? reading : nil, longPeriodText: nil)
+    }
+
+    /// Observed values take precedence over EEW forecasts.
+    var display: IntensityReading? { observed ?? forecast }
+    var isForecast: Bool { observed == nil && forecast != nil }
 }
 
 // MARK: - Tsunami forecasts

@@ -59,10 +59,15 @@ struct HistoryFilter {
         !minimumIntensity.isEmpty || dateRangeEnabled || unreadOnly || pinnedOnly
     }
     func matches(_ event: EventEntity, searchText: String, unread: Bool, pinned: Bool) -> Bool {
+        matches(event, searchText: searchText, unread: unread, pinned: pinned, maxIntensity: event.maxIntensity)
+    }
+    /// `maxIntensity` is the value the row displays. For earthquakes it comes from all
+    /// reports (EarthquakeIntensitySummary), not only the latest publication.
+    func matches(_ event: EventEntity, searchText: String, unread: Bool, pinned: Bool, maxIntensity: String?) -> Bool {
         if unreadOnly && !unread || pinnedOnly && !pinned { return false }
         if !eventType.isEmpty && event.eventType != eventType { return false }
         if !minimumIntensity.isEmpty {
-            guard let intensity = event.maxIntensity, let rank = IntensityValue.rank(intensity),
+            guard let intensity = maxIntensity, let rank = IntensityValue.rank(intensity),
                   let minimum = IntensityValue.rank(minimumIntensity), rank >= minimum else { return false }
         }
         if dateRangeEnabled {

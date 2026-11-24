@@ -62,7 +62,7 @@ struct OverviewView: View {
                 Text("受信した最新の発表に基づきます。受信が途切れていた間の変更は反映されません。")
             }
             Section {
-                EarthquakeStatistics(earthquakes: earthquakes, now: now)
+                EarthquakeStatistics(earthquakes: earthquakes, reports: groups, now: now)
             } header: {
                 Text("地震の受信件数")
             }
@@ -155,6 +155,7 @@ private struct ReceiverStatusDetail: View {
 /// Received earthquake counts and the strongest observed intensity.
 private struct EarthquakeStatistics: View {
     let earthquakes: [EventEntity]
+    let reports: [String: [ReportEntity]]
     let now: Date
 
     var body: some View {
@@ -171,8 +172,9 @@ private struct EarthquakeStatistics: View {
     private func tile(_ title: String, seconds: TimeInterval) -> some View {
         let since = now.addingTimeInterval(-seconds)
         let matching = earthquakes.filter { (ValueText.originTime($0.numericHypocenter) ?? $0.latestReportAt) >= since }
-        let strongest = matching.filter { !$0.isEEW && !$0.isCancelled }
-            .compactMap { IntensityReading($0.maxIntensity) }
+        // Observed values of each earthquake, even after a later 震源要素更新 or 長周期 report.
+        let strongest = matching
+            .compactMap { EarthquakeIntensitySummary(event: $0, reports: reports[$0.id] ?? []).observed }
             .max { IntensityReading.sortKey($0) < IntensityReading.sortKey($1) }
         return VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
