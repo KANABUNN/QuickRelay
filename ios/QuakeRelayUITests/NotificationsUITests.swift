@@ -67,6 +67,9 @@ final class NotificationsUITests: XCTestCase {
         guard app.tabBars.buttons["津波"].waitForExistence(timeout: 15) else {
             XCTFail("Loopback pairing did not complete"); return
         }
+        // The overview tab opens first; the history assertions start on the earthquake tab.
+        XCTAssertTrue(app.tabBars.buttons["概況"].exists)
+        app.tabBars.buttons["地震"].tap()
         assertListTitle("地震", in: app)
         try await action("capture/earthquake-list", at: control, body: XCUIScreen.main.screenshot().pngRepresentation)
         let search = app.searchFields.firstMatch
