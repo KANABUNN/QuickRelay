@@ -16,12 +16,14 @@ type IngestResult struct {
 }
 
 func (s *Store) Ingest(ctx context.Context, r model.Report) (IngestResult, error) {
-	return s.ingest(ctx, r, true)
+	return s.ingest(ctx, r, true, nil)
 }
 func (s *Store) IngestHistorical(ctx context.Context, r model.Report) (IngestResult, error) {
-	return s.ingest(ctx, r, false)
+	return s.ingest(ctx, r, false, nil)
 }
-func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (IngestResult, error) {
+
+// handoff is nil unless the EEW bridge hand-off is enabled; historical imports never hand off.
+func (s *Store) ingest(ctx context.Context, r model.Report, notify bool, handoff *Handoff) (IngestResult, error) {
 	out := IngestResult{}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -76,6 +78,12 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 		return out, err
 	}
 	out.Current = current
+	handedOff := handoff != nil && notify && HandoffTelegram(r.TelegramType)
+	if handedOff {
+		if err = writeHandoff(ctx, tx, r, *handoff, current, time.Now()); err != nil {
+			return out, err
+		}
+	}
 	if current {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO streams(event_id,telegram_type,payload) VALUES(?,?,?)
    ON CONFLICT(event_id,telegram_type) DO UPDATE SET payload=excluded.payload`, r.EventID, r.TelegramType, string(payload)); err != nil {
@@ -144,7 +152,13 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 			return out, err
 		}
 	}
-	return out, tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return out, err
+	}
+	if handedOff {
+		s.handoff.fire()
+	}
+	return out, nil
 }
 func (s *Store) Sync(ctx context.Context, after int64, limit int) (model.SyncPage, error) {
 	out := model.SyncPage{OK: true, Items: []model.SyncItem{}, Next: after, ServerTime: Time(time.Now())}

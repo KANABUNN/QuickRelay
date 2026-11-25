@@ -88,3 +88,27 @@ func TestDMDATAFormatModeDefaultAndRollback(t *testing.T) {
 		t.Fatal("JSON rollback ignored")
 	}
 }
+func TestEEWHandoffIsOffByDefaultAndValidated(t *testing.T) {
+	t.Setenv("EEW_HANDOFF", "")
+	t.Setenv("EEW_HANDOFF_SOCKET", "")
+	c := Load()
+	if c.HandoffEnabled() || c.EEWHandoffSocket != "/run/quick-relay-handoff/handoff.sock" {
+		t.Fatal("hand-off must default to off", c.EEWHandoff, c.EEWHandoffSocket)
+	}
+	c.Mode, c.Listen, c.PairingSecret = "offline", "127.0.0.1:8080", "01234567890123456789012345678901"
+	for _, tc := range []struct {
+		mode, socket string
+		ok           bool
+	}{
+		{"off", "relative.sock", true},
+		{"on", "/run/quick-relay-handoff/handoff.sock", true},
+		{"yes", "/run/quick-relay-handoff/handoff.sock", false},
+		{"on", "relative.sock", false},
+		{"on", "/" + string(make([]byte, 120)), false},
+	} {
+		c.EEWHandoff, c.EEWHandoffSocket = tc.mode, tc.socket
+		if err := c.Validate(); (err == nil) != tc.ok {
+			t.Fatal(tc.mode, tc.socket, err)
+		}
+	}
+}

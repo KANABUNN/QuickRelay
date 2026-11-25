@@ -26,7 +26,10 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-type Store struct{ DB *sql.DB }
+type Store struct {
+	DB      *sql.DB
+	handoff handoffSignal
+}
 
 var ErrUnauthorized = errors.New("unauthorized")
 var ErrInvalid = errors.New("invalid request")
