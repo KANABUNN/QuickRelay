@@ -12,6 +12,8 @@
   "archives": "/var/backups/quick-relay",
   "state_dir": "/var/lib/quick-relay-ops",
   "readiness_url": "http://127.0.0.1:8080/readyz",
+  "extra_databases": {},
+  "bridge_health_url": null,
   "disk_path": "/",
   "port": 9081,
   "min_free_bytes": 1073741824,

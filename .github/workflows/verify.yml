@@ -42,7 +42,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y caddy shellcheck gnupg
-          shellcheck deploy/install.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh ios/Scripts/test-watch.sh
+          shellcheck deploy/install.sh deploy/install-bridge.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh ios/Scripts/test-watch.sh
           sh scripts/verify-deploy.sh
           python3 -m unittest discover -s deploy/operations -p 'test_*.py' -v
       - name: Secret patterns and whitespace

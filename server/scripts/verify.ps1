@@ -22,6 +22,7 @@ try {
     Invoke-Go @("vet", "./...")
     Invoke-Go @("build", "-trimpath", "-o", ".local/quakerelay.exe", "./cmd/quakerelay")
     Invoke-Go @("build", "-trimpath", "-o", ".local/apns-send.exe", "./cmd/apns-send")
+    Invoke-Go @("build", "-trimpath", "-o", ".local/eew-bridge.exe", "./cmd/eew-bridge")
     & $Python scripts/smoke.py --binary .local/quakerelay.exe
     if ($LASTEXITCODE -ne 0) { throw "Smoke test failed" }
     $env:GOOS = "linux"
@@ -29,6 +30,7 @@ try {
         $env:GOARCH = $arch
         Invoke-Go @("build", "-trimpath", "-o", ".local/quakerelay-linux-$arch", "./cmd/quakerelay")
         Invoke-Go @("build", "-trimpath", "-o", ".local/apns-send-linux-$arch", "./cmd/apns-send")
+        Invoke-Go @("build", "-trimpath", "-o", ".local/eew-bridge-linux-$arch", "./cmd/eew-bridge")
     }
 } finally {
     foreach ($name in $savedEnvironment.Keys) {

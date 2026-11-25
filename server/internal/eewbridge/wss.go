@@ -64,7 +64,7 @@ type Server struct {
 
 	mu       sync.Mutex
 	sessions map[*session]struct{}
-	failures []time.Time
+	failures map[string][]time.Time // by client address
 	wg       sync.WaitGroup
 }
 
@@ -91,21 +91,69 @@ func (s *Server) limits() (int, int) {
 	return total, perToken
 }
 
-// authAllowed bounds credential guessing across all clients.
-func (s *Server) authAllowed(now time.Time, failed bool) bool {
+// maxTrackedClients bounds the failure table. Beyond it, failures from new
+// addresses share one count, so a wide attack limits only those addresses.
+const maxTrackedClients = 4096
+
+// authAllowed bounds credential guessing per client address, so one client's
+// failures do not lock others out of reconnecting.
+func (s *Server) authAllowed(addr string, now time.Time, failed bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	kept := s.failures[:0]
-	for _, at := range s.failures {
-		if now.Sub(at) < time.Minute {
-			kept = append(kept, at)
+	recent := func(list []time.Time) []time.Time {
+		kept := list[:0]
+		for _, at := range list {
+			if now.Sub(at) < time.Minute {
+				kept = append(kept, at)
+			}
+		}
+		return kept
+	}
+	if s.failures == nil {
+		s.failures = map[string][]time.Time{}
+	}
+	if _, tracked := s.failures[addr]; !tracked && len(s.failures) >= maxTrackedClients {
+		for a, list := range s.failures {
+			if list = recent(list); len(list) == 0 {
+				delete(s.failures, a)
+			} else {
+				s.failures[a] = list
+			}
+		}
+		if len(s.failures) >= maxTrackedClients {
+			addr = ""
 		}
 	}
-	s.failures = kept
+	list := recent(s.failures[addr])
 	if failed {
-		s.failures = append(s.failures, now)
+		list = append(list, now)
 	}
-	return len(s.failures) < authFailureLimit
+	if len(list) == 0 {
+		delete(s.failures, addr)
+	} else {
+		s.failures[addr] = list
+	}
+	return len(list) < authFailureLimit
+}
+
+// clientAddress is the address failures are counted against. The listener is
+// loopback-only, so a forwarded address can only come from the local proxy.
+// Caddy replaces X-Forwarded-For from untrusted clients and appends the
+// address it accepted from last.
+func clientAddress(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		if values := r.Header.Values("X-Forwarded-For"); len(values) > 0 {
+			hops := strings.Split(values[len(values)-1], ",")
+			if last := strings.TrimSpace(hops[len(hops)-1]); net.ParseIP(last) != nil {
+				return last
+			}
+		}
+	}
+	return host
 }
 
 func bearer(r *http.Request) string {
@@ -124,13 +172,15 @@ func (s *Server) unregister(sess *session) {
 
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
-	if !s.authAllowed(now, false) {
+	client := clientAddress(r)
+	if !s.authAllowed(client, now, false) {
 		http.Error(w, "too many failed authentications", http.StatusTooManyRequests)
 		return
 	}
 	token, err := s.Store.Authenticate(r.Context(), bearer(r))
 	if errors.Is(err, ErrUnauthorized) {
-		s.authAllowed(now, true)
+		s.authAllowed(client, now, true)
+		s.Logger.Warn("EEW authentication failed", "client", client)
 		w.Header().Set("WWW-Authenticate", `Bearer realm="eew"`)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

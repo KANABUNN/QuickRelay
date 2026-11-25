@@ -39,12 +39,13 @@ python3 deploy/bootstrap-go.py || exit 1
 export PATH="$PWD/.local/toolchain/go/bin:$PATH"
 go version
 sh scripts/verify.sh || exit 1
-shellcheck deploy/install.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh || exit 1
+shellcheck deploy/install.sh deploy/install-bridge.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh || exit 1
 sh scripts/verify-deploy.sh || exit 1
 # Caddy未導入ならこの検査のCaddy部分はSKIP。第3節で必ず再検査します。
 mkdir -p server/bin
 (cd server && CGO_ENABLED=0 go build -trimpath -o bin/quakerelay ./cmd/quakerelay) || exit 1
 (cd server && CGO_ENABLED=0 go build -trimpath -o bin/apns-send ./cmd/apns-send) || exit 1
+(cd server && CGO_ENABLED=0 go build -trimpath -o bin/eew-bridge ./cmd/eew-bridge) || exit 1
 
 # 配備commit・日時・Go版・binaryハッシュを秘密設定と分けて記録します。
 install -d -m 0700 "$HOME/quick-relay-deployments"
@@ -266,18 +267,19 @@ DBには端末tokenが含まれます。設定・p8・DBを制限した別媒体
 
 ```sh
 sh scripts/verify.sh || exit 1
-shellcheck deploy/install.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh || exit 1
+shellcheck deploy/install.sh deploy/install-bridge.sh deploy/update.sh scripts/verify-deploy.sh ios/Scripts/test.sh || exit 1
 sh scripts/verify-deploy.sh || exit 1
 mkdir -p server/bin
 (cd server && CGO_ENABLED=0 go build -trimpath -o bin/quakerelay ./cmd/quakerelay) || exit 1
 (cd server && CGO_ENABLED=0 go build -trimpath -o bin/apns-send ./cmd/apns-send) || exit 1
+(cd server && CGO_ENABLED=0 go build -trimpath -o bin/eew-bridge ./cmd/eew-bridge) || exit 1
 # 第1節の記録作成部分を実行（install.shは再実行しません）。
 sudo sh deploy/update.sh || exit 1
 sudo sha256sum /opt/quick-relay/quakerelay /opt/quick-relay/apns-send >> "$DEPLOY_RECORD"
 curl --fail https://relay.example.com/readyz
 ```
 
-updateは新binaryのcheck、DB snapshot、previous binary保存、再起動、health確認を行います。設定・p8・Caddyは保持します。LISTEN_ADDRを変更した場合はCaddy/health timerと更新時の `QUICK_RELAY_HEALTH_URL` も一致させます。
+updateは新binaryのcheck、DB snapshot、previous binary保存、再起動、health確認を行います。EEWブリッジを配置済みなら `eew-bridge` も同じ手順で更新するため、ビルドから外さないでください（[EEWブリッジの配備と運用](eew-bridge-deployment.md)）。設定・p8・Caddyは保持します。LISTEN_ADDRを変更した場合はCaddy/health timerと更新時の `QUICK_RELAY_HEALTH_URL` も一致させます。
 
 復旧ではサービスを停止し、現DBとWAL/SHMをまとめて退避して、対応するsnapshotとprevious binaryを組で戻します。migration後のDBへ旧binaryだけを戻さないでください。snapshotは `sqlite3 SNAPSHOT 'PRAGMA integrity_check;'` で検査します。backupでserver_sequenceが端末cursorより小さくなった場合はiOSを再インストールして再ペアリングします。
 

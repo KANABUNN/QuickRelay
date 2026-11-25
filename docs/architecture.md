@@ -36,6 +36,6 @@ Windows、EarthQuickly、Talker、PHP、MySQL、PWAはmainの実装・ビルド�
 - [イベント・通知仕様](event-semantics.md)
 - [API契約](../contracts/README.md)
 - [EEWブリッジへの受け渡し](eew-handoff.md)（既定は無効）
-- [EEWブリッジの状態管理](eew-bridge.md)
+- [EEWブリッジの状態管理](eew-bridge.md)・[配備と運用](eew-bridge-deployment.md)
 - [VPS運用](../server/README.md)
 - [iOS受入](../ios/README.md)

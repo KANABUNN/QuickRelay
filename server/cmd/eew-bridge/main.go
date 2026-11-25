@@ -18,9 +18,9 @@ import (
 )
 
 const usage = `usage:
-  eew-bridge [-env-file FILE] serve
+  eew-bridge [-env-file FILE] serve | check
   eew-bridge [-env-file FILE] token issue -name NAME | token list | token revoke ID
-  eew-bridge [-env-file FILE] rotate-epoch
+  eew-bridge [-env-file FILE] backup NEW_FILE | rotate-epoch
   eew-bridge verify -source-db RELAY_COPY.db [-state-db NEW_BRIDGE.db] [-json]`
 
 // errMismatch makes verification differences visible in the exit status.
@@ -49,8 +49,22 @@ func run(args []string, stdout io.Writer) error {
 			return errors.New(usage)
 		}
 		return serve(c)
+	case "check":
+		if len(args) != 1 {
+			return errors.New(usage)
+		}
+		if err := c.validate(); err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, "EEW bridge configuration is valid.")
+		return nil
 	case "token":
 		return tokenCommand(c, args[1:], stdout)
+	case "backup":
+		if len(args) != 2 {
+			return errors.New("usage: eew-bridge backup NEW_FILE")
+		}
+		return backup(c, args[1], stdout)
 	case "rotate-epoch":
 		return rotateEpoch(c, stdout)
 	}

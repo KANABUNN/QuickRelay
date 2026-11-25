@@ -9,6 +9,7 @@ import tempfile
 import time
 import unittest
 from unittest.mock import patch
+import urllib.error
 
 import operations as ops
 
@@ -132,6 +133,51 @@ class OperationsTest(unittest.TestCase):
             self.assertTrue(ops.health(self.config, now + 601)["ok"])
             good["source_connected"] = False
             self.assertFalse(ops.health(self.config, now + 601)["ok"])
+
+
+    def test_extra_database_is_backed_up_and_verified(self):
+        extra = self.work / "bridge.db"
+        with contextlib.closing(sqlite3.connect(extra)) as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("CREATE TABLE tokens (id text)")
+            db.execute("INSERT INTO tokens VALUES ('t_1')")
+            db.commit()
+        self.config["extra_databases"] = {str(extra): "bridge.sqlite3"}
+        archive = self.make_backup()
+        with contextlib.redirect_stdout(io.StringIO()):
+            ops.verify(archive, self.secret, self.work / "restored", ops.digest(archive))
+        with contextlib.closing(sqlite3.connect(self.work / "restored/databases/bridge.sqlite3")) as db:
+            self.assertEqual(db.execute("SELECT id FROM tokens").fetchall(), [("t_1",)])
+        self.config["extra_databases"] = {str(extra): "../escape.sqlite3"}
+        with self.assertRaises(ops.OperationError):
+            self.make_backup()
+
+    def test_health_requires_bridge_only_once_configured(self):
+        self.make_backup()
+        state = ops.read_json(self.work / "state/backup.json")
+        state["offsite_ok"] = True
+        ops.atomic_json(self.work / "state/backup.json", state)
+        now = time.time()
+        relay = {"ok": True, "db": True, "apns_configured": True, "source_connected": True}
+        bridge = {"status": 200, "body": {"upstream": "healthy", "capture": "healthy"}}
+        def response(request, *a, **k):
+            if not request.full_url.endswith("/healthz"):
+                return io.BytesIO(json.dumps(relay).encode())
+            if bridge["status"] != 200:
+                raise urllib.error.HTTPError(request.full_url, bridge["status"], "degraded", {}, None)
+            return io.BytesIO(json.dumps(bridge["body"]).encode())
+        with patch("operations.urllib.request.urlopen", side_effect=response), \
+             patch("operations.shutil.disk_usage", return_value=shutil_usage()):
+            result = ops.health(self.config, now)
+            self.assertTrue(result["ok"])
+            self.assertNotIn("bridge", result["checks"])
+            self.config["bridge_health_url"] = "http://127.0.0.1:9082/healthz"
+            self.assertTrue(ops.health(self.config, now)["checks"]["bridge"])
+            bridge["body"]["capture"] = "degraded"
+            self.assertFalse(ops.health(self.config, now)["ok"])
+            bridge["body"]["capture"] = "healthy"
+            bridge["status"] = 503
+            self.assertFalse(ops.health(self.config, now)["ok"])
 
 
 def shutil_usage():

@@ -5,9 +5,12 @@
 | 場所 | 用途 |
 |---|---|
 | `install.sh` | 専用ユーザー、権限、秘密値を表示しない初回設定生成、unit配置 |
-| `update.sh` | 新binaryの設定検査、整合DB backup、binary更新、再起動、health確認 |
-| `caddy/Caddyfile` | 採用hostname `relay.example.com` からloopbackへHTTPS reverse proxy |
-| `systemd/quick-relay.service` | 非rootのGoリレー |
+| `install-bridge.sh` | EEWブリッジの専用ユーザー、設定、unit配置（起動しない） |
+| `update.sh` | 新binaryの設定検査、整合DB backup、binary更新、再起動、health確認。配置済みならEEWブリッジも更新 |
+| `eew-bridge.env.example` | ブリッジ設定の雛形（秘密値なし） |
+| `caddy/Caddyfile` | 採用hostname `relay.example.com` からloopbackへHTTPS reverse proxy。`/v1/eew` はブリッジのWebSocket |
+| `systemd/quick-relay.service` | 非rootのGoリレー。EEW受け渡しソケットのランタイムディレクトリを持つ |
+| `systemd/quick-relay-bridge.service` | 非rootのEEWブリッジ（`127.0.0.1:9082`）。配備は [EEWブリッジの配備と運用](../docs/eew-bridge-deployment.md) |
 | `systemd/quick-relay-health.service` / `.timer` | live readiness監視 |
 | `monitoring/alerts.yml` | Prometheusアラート定義 |
 

@@ -18,6 +18,11 @@ RestartSec=5
 TimeoutStopSec=25
 StateDirectory=quick-relay
 StateDirectoryMode=0700
+# EEW hand-off socket (EEW_HANDOFF=on). The directory is traversable; the socket
+# itself is 0660 to quick-relay-handoff, the bridge's only shared group.
+RuntimeDirectory=quick-relay-handoff
+RuntimeDirectoryMode=0711
+SupplementaryGroups=quick-relay-handoff
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

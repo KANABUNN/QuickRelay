@@ -17,4 +17,6 @@ ProtectHome=true
 ReadWritePaths=/var/backups/quick-relay /var/lib/quick-relay-ops
 # SQLite may need to create/update its WAL shared-memory sidecar while reading.
 ReadWritePaths=/var/lib/quick-relay
+# Same for the EEW bridge database when extra_databases lists it.
+ReadWritePaths=-/var/lib/quick-relay-bridge
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

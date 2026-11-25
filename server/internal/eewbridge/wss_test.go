@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -125,6 +126,71 @@ func TestWSRequiresActiveToken(t *testing.T) {
 	}
 	if _, resp, _ := f.dial("eqb_guess"); resp == nil || resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatal("guessing not limited")
+	}
+}
+
+// Behind Caddy every connection comes from loopback; one client's failures must
+// not stop the others from reconnecting.
+func TestAuthFailuresCountPerForwardedClient(t *testing.T) {
+	f := newWS(t)
+	dial := func(secret, client string) int {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		header := http.Header{"Authorization": {"Bearer " + secret}, "X-Forwarded-For": {client}}
+		conn, resp, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(f.http.URL, "http")+"/v1/eew", &websocket.DialOptions{HTTPHeader: header})
+		if err == nil {
+			conn.CloseNow()
+			return http.StatusSwitchingProtocols
+		}
+		return resp.StatusCode
+	}
+	for range authFailureLimit {
+		dial("eqb_guess", "203.0.113.7")
+	}
+	if code := dial(f.secret, "203.0.113.7"); code != http.StatusTooManyRequests {
+		t.Fatal("guessing client not limited", code)
+	}
+	if code := dial(f.secret, "198.51.100.2"); code != http.StatusSwitchingProtocols {
+		t.Fatal("another client was locked out", code)
+	}
+
+	request := func(remote string, forwarded ...string) *http.Request {
+		r := httptest.NewRequest("GET", "/v1/eew", nil)
+		r.RemoteAddr = remote
+		for _, v := range forwarded {
+			r.Header.Add("X-Forwarded-For", v)
+		}
+		return r
+	}
+	for _, c := range []struct {
+		r    *http.Request
+		want string
+	}{
+		{request("127.0.0.1:5000", "198.51.100.1, 203.0.113.9"), "203.0.113.9"},
+		{request("[::1]:5000", "10.0.0.1", "2001:db8::5"), "2001:db8::5"},
+		{request("127.0.0.1:5000", "not-an-address"), "127.0.0.1"},
+		{request("127.0.0.1:5000"), "127.0.0.1"},
+		// Only the local proxy may name the client.
+		{request("192.0.2.4:5000", "203.0.113.9"), "192.0.2.4"},
+	} {
+		if got := clientAddress(c.r); got != c.want {
+			t.Fatal(c.r.RemoteAddr, c.r.Header, got)
+		}
+	}
+	s := &Server{}
+	now := time.Now()
+	for i := range maxTrackedClients {
+		s.authAllowed(fmt.Sprintf("10.0.%d.%d", i/256, i%256), now, true)
+	}
+	// A full table shares one count for new addresses and keeps tracked ones.
+	for range authFailureLimit {
+		s.authAllowed("192.0.2.1", now, true)
+	}
+	if s.authAllowed("192.0.2.2", now, false) || !s.authAllowed("10.0.0.1", now, false) {
+		t.Fatal("overflow bucket not shared")
+	}
+	if !s.authAllowed("192.0.2.2", now.Add(2*time.Minute), false) || len(s.failures) != 0 {
+		t.Fatal("expired failures kept", len(s.failures))
 	}
 }
 
