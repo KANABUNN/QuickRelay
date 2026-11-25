@@ -23,7 +23,9 @@ type fakeUpstream struct {
 }
 
 func (f *fakeUpstream) Snapshot() dmdata.Stats {
-	return dmdata.Stats{Connected: true, LastFrameAt: time.Now()}
+	// A frame received just before: the relay's freshness check rejects a time
+	// after its own clock reading, which a nanosecond clock can produce here.
+	return dmdata.Stats{Connected: true, LastFrameAt: time.Now().Add(-time.Second)}
 }
 func (f *fakeUpstream) Generation() string {
 	f.mu.Lock()
