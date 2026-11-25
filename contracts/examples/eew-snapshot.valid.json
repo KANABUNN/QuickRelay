@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "type": "snapshot",
+  "streamId": "eew-production",
+  "epoch": "g0123456789abcdef",
+  "asOfSeq": "1052",
+  "part": 1,
+  "parts": 1,
+  "events": [
+    {
+      "eventId": "20261124115958",
+      "environment": "production",
+      "revision": "2",
+      "forecast": {
+        "status": "canceled",
+        "revision": "2",
+        "source": {
+          "issuer": "JMA", "provider": "DMDATA", "code": "VXSE45", "telegramId": "demo-c03", "serial": "3",
+          "infoType": "cancel", "issuedAt": "2026-11-24T03:00:05Z", "sentAt": null,
+          "receivedAt": "2026-11-24T03:00:05.06Z", "controlAt": "2026-11-24T03:00:05Z", "origin": "live"
+        },
+        "data": null,
+        "speechUntil": "2026-11-24T03:00:35Z"
+      },
+      "warning": null
+    }
+  ]
+}

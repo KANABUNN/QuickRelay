@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "type": "sync_complete",
+  "cursor": {"streamId": "eew-production", "epoch": "g0123456789abcdef", "seq": "1052"}
+}

@@ -1,5 +1,5 @@
 // Command eew-bridge maintains EEW state for the voice clients, separately from
-// the relay. This version provides silent verification against a relay copy.
+// the relay, and delivers it over WebSocket (docs/eew-bridge.md).
 package main
 
 import (
@@ -13,23 +13,56 @@ import (
 	"path/filepath"
 	"sort"
 
+	"quakerelay/server/internal/config"
 	"quakerelay/server/internal/eewbridge"
 )
 
-const usage = "usage: eew-bridge verify -source-db RELAY_COPY.db [-state-db NEW_BRIDGE.db] [-json]"
+const usage = `usage:
+  eew-bridge [-env-file FILE] serve
+  eew-bridge [-env-file FILE] token issue -name NAME | token list | token revoke ID
+  eew-bridge [-env-file FILE] rotate-epoch
+  eew-bridge verify -source-db RELAY_COPY.db [-state-db NEW_BRIDGE.db] [-json]`
 
 // errMismatch makes verification differences visible in the exit status.
 var errMismatch = errors.New("bridge and relay disagree")
 
 func run(args []string, stdout io.Writer) error {
-	if len(args) == 0 || args[0] != "verify" {
+	global := flag.NewFlagSet("eew-bridge", flag.ContinueOnError)
+	envFile := global.String("env-file", "", "literal KEY=value file (environment takes precedence)")
+	if err := global.Parse(args); err != nil {
+		return err
+	}
+	args = global.Args()
+	if len(args) == 0 {
 		return errors.New(usage)
 	}
+	if args[0] == "verify" {
+		return verifyCommand(args[1:], stdout)
+	}
+	if err := config.LoadEnv(*envFile); err != nil {
+		return err
+	}
+	c := loadConfig()
+	switch args[0] {
+	case "serve":
+		if len(args) != 1 {
+			return errors.New(usage)
+		}
+		return serve(c)
+	case "token":
+		return tokenCommand(c, args[1:], stdout)
+	case "rotate-epoch":
+		return rotateEpoch(c, stdout)
+	}
+	return errors.New(usage)
+}
+
+func verifyCommand(args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("verify", flag.ContinueOnError)
 	source := flags.String("source-db", "", "copy of the relay database (opened read-only)")
 	statePath := flags.String("state-db", "", "new bridge database to keep; a temporary one is used otherwise")
 	asJSON := flags.Bool("json", false, "print the report as JSON")
-	if err := flags.Parse(args[1:]); err != nil {
+	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if *source == "" || flags.NArg() != 0 {

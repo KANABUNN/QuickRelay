@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EEW bridge WebSocket messages, schemaVersion 1",
+  "description": "One JSON object per UTF-8 text frame on wss://<host>/v1/eew. Optional fields may be added within v1; receivers ignore unknown fields. Positions and revisions are decimal strings; times are UTC RFC 3339.",
+  "oneOf": [
+    {"$ref": "#/$defs/Subscribe"},
+    {"$ref": "#/$defs/SyncBegin"},
+    {"$ref": "#/$defs/Snapshot"},
+    {"$ref": "#/$defs/State"},
+    {"$ref": "#/$defs/SyncComplete"},
+    {"$ref": "#/$defs/Health"}
+  ],
+  "$defs": {
+    "Decimal": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"},
+    "Time": {"type": "string", "format": "date-time"},
+    "Cursor": {
+      "type": "object",
+      "required": ["streamId", "epoch", "seq"],
+      "properties": {
+        "streamId": {"type": "string", "minLength": 1},
+        "epoch": {"type": "string", "minLength": 1},
+        "seq": {"$ref": "#/$defs/Decimal"}
+      }
+    },
+    "Subscribe": {
+      "description": "Client to server within 5 seconds of the upgrade. resume is the cursor saved at sync_complete or after the last applied eew.state; null asks for a snapshot.",
+      "type": "object",
+      "required": ["schemaVersion", "type", "environment", "resume"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "type": {"const": "subscribe"},
+        "environment": {"enum": ["production", "training", "test"]},
+        "resume": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Cursor"}]}
+      }
+    },
+    "SyncBegin": {
+      "type": "object",
+      "required": ["schemaVersion", "type", "streamId", "epoch", "mode", "asOfSeq"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "type": {"const": "sync_begin"},
+        "streamId": {"type": "string"},
+        "epoch": {"type": "string"},
+        "mode": {"enum": ["resume", "snapshot"]},
+        "asOfSeq": {"$ref": "#/$defs/Decimal"}
+      }
+    },
+    "Snapshot": {
+      "description": "Snapshot mode only. Parts 1..parts share asOfSeq; the receiver replaces its whole state after the last part. An empty state is one part with no events.",
+      "type": "object",
+      "required": ["schemaVersion", "type", "streamId", "epoch", "asOfSeq", "part", "parts", "events"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "type": {"const": "snapshot"},
+        "streamId": {"type": "string"},
+        "epoch": {"type": "string"},
+        "asOfSeq": {"$ref": "#/$defs/Decimal"},
+        "part": {"type": "integer", "minimum": 1},
+        "parts": {"type": "integer", "minimum": 1},
+        "events": {"type": "array", "items": {"$ref": "#/$defs/Event"}}
+      }
+    },
+    "State": {
+      "description": "Full state of one event after the change at seq. replay: resent during a resume, never new speech. live: sent after sync_complete.",
+      "type": "object",
+      "required": ["schemaVersion", "type", "streamId", "epoch", "seq", "delivery", "cause", "committedAt", "changedSeries", "event"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "type": {"const": "eew.state"},
+        "streamId": {"type": "string"},
+        "epoch": {"type": "string"},
+        "seq": {"$ref": "#/$defs/Decimal"},
+        "delivery": {"enum": ["live", "replay"]},
+        "cause": {"enum": ["telegram", "reconcile"]},
+        "committedAt": {"$ref": "#/$defs/Time"},
+        "changedSeries": {"enum": ["forecast", "warning"]},
+        "event": {"$ref": "#/$defs/Event"}
+      }
+    },
+    "SyncComplete": {
+      "description": "cursor.seq equals asOfSeq. The receiver commits the synchronized state and this cursor together.",
+      "type": "object",
+      "required": ["schemaVersion", "type", "cursor"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "type": {"const": "sync_complete"},
+        "cursor": {"$ref": "#/$defs/Cursor"}
+      }
+    },
+    "Health": {
+      "description": "Every 5 seconds and on change; consumes no seq. A receiver that hears nothing for 15 seconds reconnects.",
+      "type": "object",
+      "required": ["schemaVersion", "type", "serverTime", "upstream", "capture"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "type": {"const": "health"},
+        "serverTime": {"$ref": "#/$defs/Time"},
+        "upstream": {"enum": ["healthy", "degraded"]},
+        "capture": {"enum": ["healthy", "degraded"]}
+      }
+    },
+    "Event": {
+      "type": "object",
+      "required": ["eventId", "environment", "revision", "forecast", "warning"],
+      "properties": {
+        "eventId": {"type": "string", "minLength": 1},
+        "environment": {"enum": ["production", "training", "test"]},
+        "revision": {"$ref": "#/$defs/Decimal"},
+        "forecast": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/ForecastSeries"}]},
+        "warning": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/WarningSeries"}]}
+      }
+    },
+    "ForecastSeries": {
+      "type": "object",
+      "required": ["status", "revision", "source", "data", "speechUntil"],
+      "properties": {
+        "status": {"enum": ["active", "final", "canceled"]},
+        "revision": {"$ref": "#/$defs/Decimal"},
+        "source": {"$ref": "#/$defs/Source"},
+        "data": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/ForecastData"}]},
+        "speechUntil": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]}
+      }
+    },
+    "WarningSeries": {
+      "type": "object",
+      "required": ["status", "revision", "source", "data", "speechUntil"],
+      "properties": {
+        "status": {"enum": ["active", "canceled"]},
+        "revision": {"$ref": "#/$defs/Decimal"},
+        "source": {"$ref": "#/$defs/Source"},
+        "data": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/WarningData"}]},
+        "speechUntil": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]}
+      }
+    },
+    "Source": {
+      "type": "object",
+      "required": ["issuer", "provider", "code", "telegramId", "serial", "infoType", "issuedAt", "sentAt", "receivedAt", "controlAt", "origin"],
+      "properties": {
+        "issuer": {"const": "JMA"},
+        "provider": {"const": "DMDATA"},
+        "code": {"enum": ["VXSE45", "VXSE43"]},
+        "telegramId": {"type": "string", "minLength": 1},
+        "serial": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Decimal"}]},
+        "infoType": {"enum": ["issue", "correction", "cancel"]},
+        "issuedAt": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]},
+        "sentAt": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]},
+        "receivedAt": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]},
+        "controlAt": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]},
+        "origin": {"enum": ["live", "recovered", "historical"]}
+      }
+    },
+    "Intensity": {
+      "description": "JMA codes: intensity 0-4, 5-, 5+, 6-, 6+, 7; long-period class 0-4. unknown is never zero.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["exact", "range", "lowerBound", "unknown"]},
+        "value": {"type": "string"},
+        "min": {"type": "string"},
+        "max": {"type": "string"}
+      }
+    },
+    "Hypocenter": {
+      "type": "object",
+      "required": ["code", "name", "latitude", "longitude", "quality"],
+      "properties": {
+        "code": {"type": "string"},
+        "name": {"type": "string"},
+        "latitude": {"type": ["number", "null"]},
+        "longitude": {"type": ["number", "null"]},
+        "quality": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {"enum": ["estimated", "assumed", "lowAccuracy"]},
+            "epicenterRank": {"type": "string"},
+            "epicenterRank2": {"type": "string"},
+            "depthRank": {"type": "string"},
+            "magnitudeRank": {"type": "string"},
+            "magnitudePoints": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "Arrival": {
+      "type": "object",
+      "required": ["time", "condition"],
+      "properties": {
+        "time": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]},
+        "condition": {"enum": ["predicted", "arrived", "noPrediction", "unknown"]},
+        "text": {"type": "string"}
+      }
+    },
+    "RegionForecast": {
+      "type": "object",
+      "required": ["codeType", "code", "name", "isWarning", "maxIntensity", "maxLongPeriodClass", "arrival"],
+      "properties": {
+        "codeType": {"type": "string"},
+        "code": {"type": "string"},
+        "name": {"type": "string"},
+        "prefectureCode": {"type": "string"},
+        "prefectureName": {"type": "string"},
+        "kindCode": {"type": "string"},
+        "kindName": {"type": "string"},
+        "isWarning": {"type": "boolean"},
+        "maxIntensity": {"$ref": "#/$defs/Intensity"},
+        "maxLongPeriodClass": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Intensity"}]},
+        "arrival": {"$ref": "#/$defs/Arrival"}
+      }
+    },
+    "ForecastData": {
+      "description": "For an assumed hypocenter originTime, magnitude and depthKm are null.",
+      "type": "object",
+      "required": ["originTime", "hypocenter", "magnitude", "depthKm", "maxIntensity", "maxLongPeriodClass", "regionForecasts"],
+      "properties": {
+        "originTime": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]},
+        "hypocenter": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Hypocenter"}]},
+        "magnitude": {"type": ["number", "null"]},
+        "depthKm": {"type": ["integer", "null"]},
+        "maxIntensity": {"$ref": "#/$defs/Intensity"},
+        "maxLongPeriodClass": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Intensity"}]},
+        "regionForecasts": {"type": "array", "items": {"$ref": "#/$defs/RegionForecast"}}
+      }
+    },
+    "Region": {
+      "type": "object",
+      "required": ["codeType", "code", "name", "level"],
+      "properties": {
+        "codeType": {"type": "string"},
+        "code": {"type": "string"},
+        "name": {"type": "string"},
+        "level": {"enum": ["zone", "prefecture", "region"]}
+      }
+    },
+    "ActiveRegion": {
+      "description": "sourceRef is warning.source.telegramId or a telegramId in regionSources; both fields are null when the adding report was not received.",
+      "allOf": [{"$ref": "#/$defs/Region"}],
+      "type": "object",
+      "required": ["sourceRef", "speechUntil"],
+      "properties": {
+        "sourceRef": {"type": ["string", "null"]},
+        "speechUntil": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]}
+      }
+    },
+    "WarningData": {
+      "type": "object",
+      "required": ["reportRegions", "addedRegions", "activeRegions", "regionSources", "coverage"],
+      "properties": {
+        "reportRegions": {"type": "array", "items": {"$ref": "#/$defs/Region"}},
+        "addedRegions": {"type": "array", "items": {"$ref": "#/$defs/Region"}},
+        "activeRegions": {"type": "array", "items": {"$ref": "#/$defs/ActiveRegion"}},
+        "regionSources": {"type": "array", "items": {"$ref": "#/$defs/Source"}},
+        "coverage": {"enum": ["complete", "partial"]}
+      }
+    }
+  }
+}
