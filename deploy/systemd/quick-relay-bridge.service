@@ -1,0 +1,42 @@
+[Unit]
+Description=Quick Relay EEW bridge (WebSocket delivery to voice clients)
+Wants=network-online.target
+After=network-online.target quick-relay.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=quick-relay-bridge
+Group=quick-relay-bridge
+# Only this group may connect to the relay hand-off socket.
+SupplementaryGroups=quick-relay-handoff
+# Optional: the defaults match this layout.
+EnvironmentFile=-/etc/quick-relay-bridge/bridge.env
+WorkingDirectory=/var/lib/quick-relay-bridge
+ExecStart=/opt/quick-relay/eew-bridge serve
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+StateDirectory=quick-relay-bridge
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+# The bridge never reads the relay's settings, keys or database.
+InaccessiblePaths=-/etc/quick-relay -/var/lib/quick-relay
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

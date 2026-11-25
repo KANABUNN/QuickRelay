@@ -16,6 +16,8 @@ fi
 if ! getent passwd quick-relay >/dev/null; then
   useradd --system --user-group --home-dir /var/lib/quick-relay --shell /usr/sbin/nologin quick-relay
 fi
+# quick-relay.service joins this group for the EEW hand-off socket (no members otherwise).
+getent group quick-relay-handoff >/dev/null || groupadd --system quick-relay-handoff
 install -d -o root -g root -m 0755 /opt/quick-relay
 install -d -o root -g quick-relay -m 0750 /etc/quick-relay /etc/quick-relay/keys
 install -d -o quick-relay -g quick-relay -m 0700 /var/lib/quick-relay
@@ -37,6 +39,7 @@ fi
 chown root:quick-relay /etc/quick-relay/quick-relay.env
 chmod 0640 /etc/quick-relay/quick-relay.env
 install -o root -g root -m 0644 "$repo"/deploy/systemd/quick-relay* /etc/systemd/system/
+# The bridge unit is checked by install-bridge.sh, once its binary exists.
 install -d -o root -g root -m 0755 /etc/caddy
 if [ ! -e /etc/caddy/quick-relay.Caddyfile ]; then
   install -o root -g root -m 0644 "$repo/deploy/caddy/Caddyfile" /etc/caddy/quick-relay.Caddyfile

@@ -6,7 +6,7 @@ This adds an optional operations endpoint and encrypted daily backups to the dep
 
 - `/readyz` verifies the database, configured APNs provider and recent live DMDATA frames. It supports GET and HEAD.
 - `/ops/readyz` is served on loopback port 9081 and explicitly forwarded by Caddy. GET and HEAD return 200 only when all required checks pass; otherwise 503. It exposes booleans only, with `Cache-Control: no-store`.
-- Operations checks: live readiness, at least 1 GiB and 10% free disk, successful backup no older than 30 hours, verified offsite copy, and an inactive alert drill.
+- Operations checks: live readiness, at least 1 GiB and 10% free disk, successful backup no older than 30 hours, verified offsite copy, and an inactive alert drill. Once the EEW bridge is in service, set `bridge_health_url` to its loopback `/healthz`; the endpoint then also requires both bridge states to be healthy ([EEW bridge deployment](eew-bridge-deployment.md#8-監視)).
 - A failed backup immediately marks the backup state unhealthy, even if an earlier archive was successful. If the timer stops running entirely, freshness expiration detects it.
 - Configure two external HTTPS monitors at five-minute intervals with email alerts, one for each endpoint. HTTP HEAD is supported for services whose free plan defaults to HEAD. HTTPS validation must remain enabled. Certificate-expiration advance warnings depend on the monitoring service's plan.
 - The existing `quick-relay-health.timer` also checks readiness every minute and records failures in the journal. It is not an external notification channel.
@@ -25,7 +25,7 @@ handle /ops/readyz {
 
 `operations.py backup` uses SQLite's online backup API, including committed WAL data, and checks database integrity. It bundles the snapshot, explicitly configured source files, and a SHA-256 manifest. GnuPG encrypts the archive to a full recipient fingerprint; only the public key is needed for scheduled backups. Plaintext staging is owner-only and removed on success or failure.
 
-The example includes the database, application environment/APNs key directory, Caddy configuration, main relay unit, and the matching relay/APNs command binaries. Install the operations scripts and units from the same reviewed repository revision during a rebuild; these scripts and their dedicated transfer key are not part of the example application backup.
+The example includes the database, application environment/APNs key directory, Caddy configuration, main relay unit, and the matching relay/APNs command binaries. `extra_databases` maps further SQLite databases, such as the EEW bridge database with its device token digests, to `databases/NAME.sqlite3` in the archive; each is snapshotted the same way and checked on verify. Install the operations scripts and units from the same reviewed repository revision during a rebuild; these scripts and their dedicated transfer key are not part of the example application backup.
 
 - Schedule: daily at 03:15 Asia/Tokyo, plus a randomized delay up to ten minutes; persistent timer catches a missed run after boot.
 - Local archives: `/var/backups/quick-relay`, root-only, fourteen days.

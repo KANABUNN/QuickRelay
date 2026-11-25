@@ -1,10 +1,22 @@
 # Adopted hostname. Initially use DNS-only records pointing to the VPS.
-# Allow TCP 80/443 in UFW and the VPS packet filter; keep 8080 on loopback.
+# Allow TCP 80/443 in UFW and the VPS packet filter; keep 8080 and 9082 on loopback.
 relay.example.com {
-	encode zstd gzip
+	# WebSocket frames are never compressed (the bridge also disables permessage-deflate).
+	@compress not path /v1/eew
+	encode @compress zstd gzip
 	@relay path /api/v1/* /health /healthz /readyz /metrics
 	handle @relay {
 		reverse_proxy 127.0.0.1:8080
+	}
+	# EEW bridge WebSocket (docs/eew-bridge-deployment.md). Remove this block to
+	# close the route; the relay keeps running. Requires Caddy 2.7 or later.
+	@eew path /v1/eew
+	handle @eew {
+		reverse_proxy 127.0.0.1:9082 {
+			# A config reload keeps sessions for up to 5 minutes instead of
+			# dropping every client at once; they resume afterwards.
+			stream_close_delay 5m
+		}
 	}
 	handle {
 		respond "Not found" 404

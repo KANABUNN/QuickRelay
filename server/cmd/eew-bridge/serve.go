@@ -154,6 +154,31 @@ func tokenCommand(c bridgeConfig, args []string, stdout io.Writer) error {
 	return errors.New(usage)
 }
 
+// backup writes a consistent snapshot of the bridge database. A bridge that has
+// never started has nothing to save, and no database is created for it.
+func backup(c bridgeConfig, target string, stdout io.Writer) error {
+	if _, err := os.Stat(target); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("backup target must not already exist")
+	}
+	if _, err := os.Stat(c.Database); errors.Is(err, os.ErrNotExist) {
+		fmt.Fprintln(stdout, "No bridge database yet; nothing to back up.")
+		return nil
+	}
+	st, err := eewbridge.Open(c.Database)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	if _, err = st.DB.ExecContext(context.Background(), "VACUUM INTO ?", target); err != nil {
+		return err
+	}
+	if err = os.Chmod(target, 0600); err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, "Bridge database snapshot created. After restoring one, run rotate-epoch before serve.")
+	return nil
+}
+
 // rotateEpoch starts a new delivery epoch, for example after restoring bridge.db
 // from a backup, so clients replace their state instead of resuming.
 func rotateEpoch(c bridgeConfig, stdout io.Writer) error {

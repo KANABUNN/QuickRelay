@@ -9,14 +9,15 @@
 - 運用コマンド
 - 複製 DB を使った無音検証
 
-QuickRelay 側の受け渡しは [EEW ブリッジへの受け渡し](eew-handoff.md) を参照してください。systemd と Caddy の配備は後続で追加します。
+QuickRelay 側の受け渡しは [EEW ブリッジへの受け渡し](eew-handoff.md)、systemd・Caddy・負荷測定・切り戻しは [EEW ブリッジの配備と運用](eew-bridge-deployment.md) を参照してください。
 
 | 場所 | 担当 |
 | --- | --- |
 | `server/internal/dmdata/eew.go` | `ParseEEW`。VXSE45・VXSE43 の XML 原電文を解析する。上限と XML の制限は既存の `Normalize` と同じ。 |
 | `server/internal/eew` | 状態の型と状態遷移（`Apply`）。入出力を持たない。 |
 | `server/internal/eewbridge` | `bridge.db`、受け渡しの取込（`Feeder`）、WSS 配信（`Server`）、端末トークン、ヘルス、無音検証。 |
-| `server/cmd/eew-bridge` | `serve`、`token`、`rotate-epoch`、`verify` コマンド。 |
+| `server/cmd/eew-bridge` | `serve`、`check`、`token`、`backup`、`rotate-epoch`、`verify` コマンド。 |
+| `server/cmd/eew-loadtest` | 隔離した DB で受領から WSS 端末までを測る負荷試験。 |
 | `contracts/eew-wss.schema.json` | WSS メッセージの JSON Schema。例は `contracts/examples/eew-*.valid.json`。 |
 
 ## 対象の電文
@@ -166,10 +167,12 @@ VXSE43 の `Head/Headline/Information` のうち、`Kind=31` の地域を `(code
 
 ```sh
 eew-bridge serve
+eew-bridge check                           # 設定を検査する（待受はループバックだけ）
 eew-bridge token issue -name "居間の PC"   # トークンは一度だけ表示する。DB には SHA-256 だけを保存する
 eew-bridge token list
 eew-bridge token revoke t_xxxxxxxxxxxx     # 接続中のセッションは 5 秒以内に 4410 で閉じる
-eew-bridge rotate-epoch                    # bridge.db をバックアップから戻した後に実行する
+eew-bridge backup /path/to/new.db          # 整合した snapshot。まだ DB がなければ何もしない
+eew-bridge rotate-epoch                    # bridge.db をバックアップから戻した後、起動前に実行する
 ```
 
 `GET /healthz`（ループバック）は `upstream`、`capture`、セッション数、`epoch`、最終連番を返します。両方が `healthy` のときだけ 200 です。

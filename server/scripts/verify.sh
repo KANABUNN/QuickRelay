@@ -8,6 +8,7 @@ go vet ./...
 mkdir -p .local
 CGO_ENABLED=0 go build -trimpath -o .local/quakerelay ./cmd/quakerelay
 CGO_ENABLED=0 go build -trimpath -o .local/apns-send ./cmd/apns-send
+CGO_ENABLED=0 go build -trimpath -o .local/eew-bridge ./cmd/eew-bridge
 python3 scripts/smoke.py --binary .local/quakerelay
 # The race detector requires a C compiler even though production uses pure Go SQLite.
 if command -v cc >/dev/null 2>&1; then

@@ -119,7 +119,53 @@ func TestTokenCommands(t *testing.T) {
 func TestServeRejectsPublicListener(t *testing.T) {
 	t.Setenv("EEW_BRIDGE_LISTEN", "0.0.0.0:9082")
 	t.Setenv("EEW_BRIDGE_DATABASE", filepath.Join(t.TempDir(), "bridge.db"))
-	if err := run([]string{"serve"}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "loopback") {
+	for _, command := range []string{"serve", "check"} {
+		if err := run([]string{command}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "loopback") {
+			t.Fatal(command, err)
+		}
+	}
+}
+
+func TestCheckAndBackupCommands(t *testing.T) {
+	dir := t.TempDir()
+	database := filepath.Join(dir, "bridge.db")
+	// The env file sets the process environment; restore it afterwards.
+	t.Setenv("EEW_BRIDGE_DATABASE", "")
+	os.Unsetenv("EEW_BRIDGE_DATABASE")
+	env := filepath.Join(dir, "bridge.env")
+	if err := os.WriteFile(env, []byte("# comment\nEEW_BRIDGE_DATABASE="+database+"\n"), 0600); err != nil {
 		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := run([]string{"-env-file", env, "check"}, &out); err != nil || !strings.Contains(out.String(), "valid") {
+		t.Fatal(out.String(), err)
+	}
+	// Before the first start there is nothing to save, and nothing is created.
+	if err := run([]string{"-env-file", env, "backup", filepath.Join(dir, "none.db")}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(database); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("backup created the bridge database")
+	}
+	if err := run([]string{"-env-file", env, "token", "issue", "-name", "pc"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := filepath.Join(dir, "snapshot.db")
+	if err := run([]string{"-env-file", env, "backup", snapshot}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"-env-file", env, "backup", snapshot}, &out); err == nil {
+		t.Fatal("overwrote an existing snapshot")
+	}
+	// The snapshot keeps the device tokens.
+	out.Reset()
+	t.Setenv("EEW_BRIDGE_DATABASE", snapshot)
+	if err := run([]string{"token", "list"}, &out); err != nil || !strings.Contains(out.String(), "pc") {
+		t.Fatal(out.String(), err)
+	}
+	for _, args := range [][]string{{"check", "x"}, {"backup"}} {
+		if err := run(args, &out); err == nil {
+			t.Fatal("accepted", args)
+		}
 	}
 }

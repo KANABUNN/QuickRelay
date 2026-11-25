@@ -14,7 +14,7 @@ QuickRelay がライブで受けた緊急地震速報（VXSE43・VXSE45）を、
 | `EEW_HANDOFF_SOCKET` | `/run/quick-relay-handoff/handoff.sock` | ソケットの絶対パス（100 バイト以下）。 |
 | `EEW_HANDOFF_SOCKET_GROUP` | なし | ソケットに付けるグループ。指定するとモード 0660 にする。指定しなければ所有者だけが接続できる。 |
 
-ブリッジのユーザーには、このグループだけを付与します。`quick-relay` グループには `/etc/quick-relay` の秘密情報を読む権限があるので使いません。systemd のランタイムディレクトリとグループの作成は、ブリッジの配備と一緒に追加します。
+ブリッジのユーザーには、このグループだけを付与します。`quick-relay` グループには `/etc/quick-relay` の秘密情報を読む権限があるので使いません。配備では `quick-relay-handoff` グループを使います。`quick-relay.service` がランタイムディレクトリ `/run/quick-relay-handoff`（0711）を作り、このグループを補助グループに持ちます（[配備と運用](eew-bridge-deployment.md#3-受け渡しを有効にする)）。
 
 ソケットの作成に失敗しても、QuickRelay の受信は止めません。エラーをログに出し、受け渡し記録の書き込みだけを続けます。
 

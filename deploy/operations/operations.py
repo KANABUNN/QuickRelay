@@ -93,6 +93,12 @@ def package(config, target, work):
     root = work / "payload"
     root.mkdir(mode=0o700)
     snapshot(config["database"], root / "database.sqlite3")
+    # Other services' databases, such as the EEW bridge's device tokens.
+    for source, name in config.get("extra_databases", {}).items():
+        if not re.fullmatch(r"[a-z0-9-]+\.sqlite3", name):
+            raise OperationError("Unsafe extra database name")
+        (root / "databases").mkdir(exist_ok=True, mode=0o700)
+        snapshot(source, root / "databases" / name)
     for source, name in config["sources"].items():
         safe_name(name)
         for item, relative in regular_files(source):
@@ -205,6 +211,10 @@ def unpack_verified(plain, destination):
             raise OperationError("Restored database integrity check failed")
         counts = {table: db.execute('SELECT count(*) FROM "' + table + '"').fetchone()[0]
                   for table in ("devices", "reports", "deliveries")}
+    for extra in sorted((destination / "databases").glob("*.sqlite3")):
+        with contextlib.closing(sqlite3.connect(extra.as_uri() + "?mode=ro", uri=True)) as db:
+            if db.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+                raise OperationError("Restored database integrity check failed")
     return counts
 
 
@@ -251,6 +261,16 @@ def health(config, now=None):
     checks = {"relay": relay_ok, "disk": disk_ok, "backup": backup_ok,
               "offsite": offsite_ok, "alert_drill": not drill_active}
     required = [checks[k] for k in ("relay", "disk", "backup", "alert_drill")]
+    # Only once the EEW bridge is in service: its /healthz is 503 while degraded.
+    if config.get("bridge_health_url"):
+        try:
+            request = urllib.request.Request(config["bridge_health_url"], headers={"Accept": "application/json"})
+            with urllib.request.urlopen(request, timeout=5) as response:
+                bridge = json.load(response)
+            checks["bridge"] = bridge.get("upstream") == "healthy" and bridge.get("capture") == "healthy"
+        except Exception:
+            checks["bridge"] = False
+        required.append(checks["bridge"])
     if config.get("require_offsite", True):
         required.append(offsite_ok)
     return {"ok": all(required), "checks": checks}
