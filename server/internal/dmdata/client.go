@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 )
 
 type Stats struct {
@@ -24,8 +25,10 @@ type Stats struct {
 	LastFrameAt time.Time `json:"last_frame_at"`
 	LastDataAt  time.Time `json:"last_data_at"`
 	Reconnects  uint64    `json:"reconnects"`
-	Rejected    uint64    `json:"rejected"`
-	LastError   string    `json:"last_error,omitempty"`
+	// Sessions counts WebSocket connections established by this process.
+	Sessions  uint64 `json:"sessions"`
+	Rejected  uint64 `json:"rejected"`
+	LastError string `json:"last_error,omitempty"`
 }
 type Client struct {
 	parameterMu          sync.Mutex
@@ -38,6 +41,8 @@ type Client struct {
 	allowTestEndpoint    bool
 	mu                   sync.Mutex
 	stats                Stats
+	// boot distinguishes connection generations across process restarts.
+	boot string
 }
 
 type socketRequest struct {
@@ -96,10 +101,19 @@ func NewWithFormat(token, authMode string, classifications []string, mode string
 	if authMode != "api_key" && authMode != "oauth" {
 		return nil, errors.New("DMDATA_AUTH_MODE must be api_key or oauth")
 	}
-	return &Client{token: token, authMode: authMode, subscription: request, baseURL: "https://api.dmdata.jp/v2", http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{token: token, authMode: authMode, subscription: request, baseURL: "https://api.dmdata.jp/v2", boot: uuid.NewString(), http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Snapshot() Stats { c.mu.Lock(); defer c.mu.Unlock(); return c.stats }
-func (c *Client) Rejected()       { c.mu.Lock(); c.stats.Rejected++; c.mu.Unlock() }
+
+// Generation names the current upstream connection: frames from different
+// generations may have a reception gap between them. Handlers run inside the
+// session that delivered the frame, so a handler reads its own generation.
+func (c *Client) Generation() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return fmt.Sprintf("%s:%d", c.boot, c.stats.Sessions)
+}
+func (c *Client) Rejected() { c.mu.Lock(); c.stats.Rejected++; c.mu.Unlock() }
 func (c *Client) authorize(req *http.Request) {
 	if c.authMode == "api_key" {
 		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(c.token+":")))
@@ -196,6 +210,7 @@ func (c *Client) session(parent context.Context, handle func(context.Context, []
 	conn.SetReadLimit(MaxMessageBytes)
 	c.mu.Lock()
 	c.stats.Connected = true
+	c.stats.Sessions++
 	c.stats.LastError = ""
 	c.stats.LastFrameAt = time.Now()
 	c.mu.Unlock()

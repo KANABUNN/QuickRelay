@@ -23,6 +23,10 @@ type Result struct {
 type Processor struct {
 	Store      *store.Store
 	Historical bool
+	// Handoff records live VXSE43/VXSE45 reports for the EEW bridge in the ingest
+	// transaction. Upstream names the DMDATA connection the frame arrived on.
+	Handoff  bool
+	Upstream string
 }
 
 func (p Processor) Process(ctx context.Context, frame []byte, received time.Time) (Result, error) {
@@ -47,9 +51,12 @@ func (p Processor) Process(ctx context.Context, frame []byte, received time.Time
 	}
 	started = time.Now()
 	if out.State == "normalized" {
-		if p.Historical {
+		switch {
+		case p.Historical:
 			out.Ingest, err = p.Store.IngestHistorical(ctx, out.Report)
-		} else {
+		case p.Handoff:
+			out.Ingest, err = p.Store.IngestWithHandoff(ctx, out.Report, store.Handoff{ReceiptID: id, Upstream: p.Upstream})
+		default:
 			out.Ingest, err = p.Store.Ingest(ctx, out.Report)
 		}
 		if err != nil {

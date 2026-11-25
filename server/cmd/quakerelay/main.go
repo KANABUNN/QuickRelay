@@ -19,6 +19,7 @@ import (
 	"quakerelay/server/internal/apns"
 	"quakerelay/server/internal/config"
 	"quakerelay/server/internal/dmdata"
+	"quakerelay/server/internal/handoff"
 	"quakerelay/server/internal/ingest"
 	"quakerelay/server/internal/relay"
 	"quakerelay/server/internal/store"
@@ -165,12 +166,35 @@ func serve(c config.Config, st *store.Store) error {
 	go func() { httpErr <- server.Serve(listener) }()
 	var wg sync.WaitGroup
 	fatal := make(chan error, 1)
+	// Rows left from an earlier enabled period expire even while the hand-off is off.
+	wg.Add(1)
+	go func() { defer wg.Done(); handoff.RunPruner(ctx, st, logger) }()
+	if c.HandoffEnabled() {
+		// The bridge is optional: a socket failure is logged and never stops reception or APNs.
+		var upstream handoff.Upstream
+		if source != nil {
+			upstream = source
+		}
+		if ln, err := handoff.Listen(c.EEWHandoffSocket, c.EEWHandoffSocketGroup); err != nil {
+			logger.Error("EEW hand-off socket unavailable; rows are still recorded", "error", err.Error())
+		} else {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := handoff.Serve(ctx, ln, handoff.New(st, upstream)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					logger.Error("EEW hand-off socket stopped", "error", err.Error())
+				}
+			}()
+			logger.Info("EEW hand-off enabled", "socket", c.EEWHandoffSocket)
+		}
+	}
 	if source != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			source.Run(ctx, func(ctx context.Context, frame []byte) error {
-				processed, err := (ingest.Processor{Store: st}).Process(ctx, frame, time.Now())
+				processor := ingest.Processor{Store: st, Handoff: c.HandoffEnabled(), Upstream: source.Generation()}
+				processed, err := processor.Process(ctx, frame, time.Now())
 				if err != nil {
 					if ctx.Err() != nil {
 						return ctx.Err()
@@ -189,6 +213,7 @@ func serve(c config.Config, st *store.Store) error {
 				if processed.Ingest.Inserted {
 					logger.Info("telegram committed", "sequence", processed.Ingest.Sequence, "current", processed.Ingest.Current,
 						"kind", processed.Report.Classification, "format_mode", c.DMDATAFormatMode,
+						"eew_handoff", processor.Handoff && store.HandoffTelegram(processed.Report.TelegramType),
 						"archive_us", processed.ArchiveTime.Microseconds(), "normalize_us", processed.NormalizeTime.Microseconds(),
 						"commit_us", processed.CommitTime.Microseconds())
 				}

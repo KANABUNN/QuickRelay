@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,7 @@ import (
 	"quakerelay/server/internal/store"
 )
 
-func setup(t *testing.T) (*store.Store, []byte, time.Time) {
+func setup(t testing.TB) (*store.Store, []byte, time.Time) {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -46,7 +47,7 @@ func setup(t *testing.T) (*store.Store, []byte, time.Time) {
 	}
 	return st, frame, now
 }
-func count(t *testing.T, st *store.Store, query string) int {
+func count(t testing.TB, st *store.Store, query string) int {
 	t.Helper()
 	var n int
 	if err := st.DB.QueryRow(query).Scan(&n); err != nil {
@@ -215,5 +216,68 @@ func TestEmptyFrameIsArchivedAndReceptionCanContinue(t *testing.T) {
 	result, err = processor.Process(ctx, frame, now)
 	if err != nil || result.State != "normalized" || !result.Ingest.Inserted {
 		t.Fatal("next valid frame lost", result, err)
+	}
+}
+
+// frameWithSerial returns a distinct live VXSE45 frame for the sample telegram.
+func frameWithSerial(t testing.TB, frame []byte, serial int) []byte {
+	t.Helper()
+	var e dmdata.Envelope
+	if err := json.Unmarshal(frame, &e); err != nil {
+		t.Fatal(err)
+	}
+	e.ID = fmt.Sprintf("receipt-%d", serial)
+	e.Body = strings.Replace(e.Body, "<Serial>1</Serial>", fmt.Sprintf("<Serial>%d</Serial>", serial), 1)
+	out, err := json.Marshal(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func TestLiveHandoffRecordsReceiptAndGeneration(t *testing.T) {
+	st, frame, now := setup(t)
+	ctx := context.Background()
+	got, err := (Processor{Store: st, Handoff: true, Upstream: "boot:7"}).Process(ctx, frame, now)
+	if err != nil || !got.Ingest.Inserted {
+		t.Fatal(got, err)
+	}
+	var receipt, upstream string
+	var reportSequence int64
+	if err = st.DB.QueryRow("SELECT receipt_id,upstream_generation,report_sequence FROM eew_handoff").Scan(&receipt, &upstream, &reportSequence); err != nil {
+		t.Fatal(err)
+	}
+	if receipt != got.ReceiptID || upstream != "boot:7" || reportSequence != got.Ingest.Sequence {
+		t.Fatal("hand-off identity", receipt, upstream, reportSequence)
+	}
+	// Disabled hand-off and historical replay leave no rows; APNs outbox is unchanged.
+	if _, err = (Processor{Store: st}).Process(ctx, frameWithSerial(t, frame, 2), now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = (Processor{Store: st, Historical: true, Handoff: true}).Process(ctx, frameWithSerial(t, frame, 3), now); err != nil {
+		t.Fatal(err)
+	}
+	if count(t, st, "SELECT count(*) FROM eew_handoff") != 1 || count(t, st, "SELECT count(*) FROM deliveries") != 2 {
+		t.Fatal("hand-off scope or outbox changed")
+	}
+}
+
+// Compare with: go test ./internal/ingest -bench Process -benchtime 500x
+func BenchmarkProcess(b *testing.B) {
+	for _, handoff := range []bool{false, true} {
+		b.Run(fmt.Sprintf("handoff=%v", handoff), func(b *testing.B) {
+			st, frame, now := setup(b)
+			p := Processor{Store: st, Handoff: handoff, Upstream: "boot:1"}
+			frames := make([][]byte, b.N)
+			for i := range frames {
+				frames[i] = frameWithSerial(b, frame, i+1)
+			}
+			b.ResetTimer()
+			for i := range b.N {
+				if _, err := p.Process(context.Background(), frames[i], now); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }

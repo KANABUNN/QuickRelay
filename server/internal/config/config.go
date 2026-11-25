@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"quakerelay/server/internal/apns"
@@ -20,7 +21,12 @@ type Config struct {
 	APNsEnvironment                               string
 	APNsSandboxKeyID, APNsSandboxKeyFile          string
 	APNsProductionKeyID, APNsProductionKeyFile    string
+	// EEW bridge hand-off: off (default) or on, and its Unix socket.
+	EEWHandoff, EEWHandoffSocket, EEWHandoffSocketGroup string
 }
+
+// HandoffEnabled reports whether live VXSE43/VXSE45 are recorded for the EEW bridge.
+func (c Config) HandoffEnabled() bool { return c.EEWHandoff == "on" }
 
 // LoadEnv reads literal KEY=value entries. It never invokes a shell or expands variables.
 // Existing process environment takes precedence over the optional file.
@@ -74,6 +80,8 @@ func Load() Config {
 		APNsEnvironment:  get("APNS_ENVIRONMENT", "development"),
 		APNsSandboxKeyID: os.Getenv("APNS_SANDBOX_KEY_ID"), APNsSandboxKeyFile: os.Getenv("APNS_SANDBOX_KEY_PATH"),
 		APNsProductionKeyID: os.Getenv("APNS_PRODUCTION_KEY_ID"), APNsProductionKeyFile: os.Getenv("APNS_PRODUCTION_KEY_PATH"),
+		EEWHandoff: get("EEW_HANDOFF", "off"), EEWHandoffSocket: get("EEW_HANDOFF_SOCKET", "/run/quick-relay-handoff/handoff.sock"),
+		EEWHandoffSocketGroup: os.Getenv("EEW_HANDOFF_SOCKET_GROUP"),
 	}
 }
 func (c Config) Validate() error {
@@ -90,6 +98,15 @@ func (c Config) Validate() error {
 	}
 	if len(c.PairingSecret) < 32 || strings.Contains(c.PairingSecret, "REPLACE_") {
 		return errors.New("set PAIRING_SECRET to at least 32 random characters")
+	}
+	if c.EEWHandoff != "" && c.EEWHandoff != "on" && c.EEWHandoff != "off" {
+		return errors.New("EEW_HANDOFF must be on or off")
+	}
+	if c.HandoffEnabled() {
+		// sockaddr_un holds at most 108 bytes including the terminator.
+		if !strings.HasPrefix(c.EEWHandoffSocket, "/") && !filepath.IsAbs(c.EEWHandoffSocket) || len(c.EEWHandoffSocket) > 100 {
+			return errors.New("EEW_HANDOFF_SOCKET must be an absolute path of at most 100 bytes")
+		}
 	}
 	if c.Mode == "live" {
 		required := map[string]string{"DMDATA_TOKEN": c.DMDATAToken, "APNS_TEAM_ID": c.APNsTeam, "APNS_BUNDLE_ID": c.APNsBundle}

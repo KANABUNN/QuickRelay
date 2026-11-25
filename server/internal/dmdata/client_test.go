@@ -179,15 +179,22 @@ func TestRunReconnectsWithFreshTicketsAfterMalformedFrame(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 	received := false
+	generations := map[string]string{}
 	c.Run(ctx, func(_ context.Context, data []byte) error {
+		generations[string(data)] = c.Generation()
 		if strings.Contains(string(data), "reconnected") {
 			received = true
 			cancel()
 		}
 		return nil
 	})
-	if !received || starts.Load() != 2 || closes.Load() != 2 || c.Snapshot().Reconnects != 1 {
+	if !received || starts.Load() != 2 || closes.Load() != 2 || c.Snapshot().Reconnects != 1 || c.Snapshot().Sessions != 2 {
 		t.Fatal("reconnect failed", starts.Load(), closes.Load(), c.Snapshot())
+	}
+	// Frames from the first and second connection carry different generations.
+	first, second := generations["{malformed"], generations[`{"type":"data","id":"reconnected"}`]
+	if !strings.HasSuffix(first, ":1") || !strings.HasSuffix(second, ":2") || strings.TrimSuffix(first, "1") != strings.TrimSuffix(second, "2") {
+		t.Fatal("upstream generation", generations)
 	}
 }
 
