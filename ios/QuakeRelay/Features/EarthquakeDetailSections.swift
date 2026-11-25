@@ -470,17 +470,35 @@ private struct WarningAreaTags: View {
 }
 
 /// Report-by-report EEW values. Warning rows never show magnitude or depth.
+///
+/// The columns keep their natural widths and the spare width of the row is
+/// shared equally between them, so the table spans the whole row. When the
+/// natural widths do not fit (large Dynamic Type), the compact layout with
+/// fixed gaps lets the cells wrap instead.
 private struct EEWHistoryGrid: View {
     let entries: [ReportEntity]
 
+    private static let gap: CGFloat = 10
+
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 4) {
+        ViewThatFits(in: .horizontal) {
+            table(spread: true)
+            table(spread: false)
+        }
+    }
+
+    private func table(spread: Bool) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 4) {
             GridRow {
-                Text("報").gridColumnAlignment(.leading)
-                Text("発表")
-                Text("予想")
-                Text("M").gridColumnAlignment(.trailing)
-                Text("深さ").gridColumnAlignment(.trailing)
+                Text("報").naturalWidth(spread).gridColumnAlignment(.leading)
+                gapCell(spread)
+                Text("発表").naturalWidth(spread)
+                gapCell(spread)
+                Text("予想").naturalWidth(spread)
+                gapCell(spread)
+                Text("M").naturalWidth(spread).gridColumnAlignment(.trailing)
+                gapCell(spread)
+                Text("深さ").naturalWidth(spread).gridColumnAlignment(.trailing)
             }
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
@@ -495,20 +513,39 @@ private struct EEWHistoryGrid: View {
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(warning ? Color.red : Color.orange)
                     }
+                    .naturalWidth(spread)
+                    gapCell(spread)
                     Text(DisplayTime.time(report.occurredAt ?? report.receivedAt)).font(.caption.monospacedDigit())
+                        .naturalWidth(spread)
+                    gapCell(spread)
                     IntensityBadge(reading: IntensityReading(report.maxIntensity), size: 28)
+                    gapCell(spread)
                     Text(warning ? "−" : (ValueText.magnitude(value) ?? "−")).font(.caption.monospacedDigit())
+                        .naturalWidth(spread)
+                    gapCell(spread)
                     Text(warning ? "−" : (value?.depthText ?? "−")).font(.caption.monospacedDigit())
+                        .naturalWidth(spread)
                 }
                 GridRow {
                     Text(rowNote(report))
                         .font(.caption2)
                         .foregroundStyle(report.isCancelled ? Color.orange : Color.secondary)
-                        .gridCellColumns(5)
+                        .gridCellColumns(9)
+                        // Wraps within the columns instead of widening them.
+                        .gridCellUnsizedAxes(.horizontal)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
+    }
+
+    /// Empty column between two value columns. When spread, every gap takes an
+    /// equal share of the spare width; its ideal width equals the compact gap,
+    /// so `ViewThatFits` falls back exactly when the natural widths do not fit.
+    private func gapCell(_ spread: Bool) -> some View {
+        Color.clear
+            .frame(minWidth: Self.gap, idealWidth: Self.gap, maxWidth: spread ? .infinity : Self.gap)
+            .gridCellUnsizedAxes(.vertical)
     }
 
     private func rowNote(_ report: ReportEntity) -> String {
@@ -521,6 +558,20 @@ private struct EEWHistoryGrid: View {
         if let change = report.eew?.change?.shortText { parts.append(change) }
         if report.isFinal { parts.append("最終報") }
         return parts.isEmpty ? " " : parts.joined(separator: " · ")
+    }
+}
+
+private extension View {
+    /// Keeps an EEW history cell at its natural width in the spread table, so
+    /// the flexible gaps never squeeze it into wrapping. The compact table
+    /// leaves the cell free to wrap.
+    @ViewBuilder
+    func naturalWidth(_ enabled: Bool) -> some View {
+        if enabled {
+            fixedSize(horizontal: true, vertical: false)
+        } else {
+            self
+        }
     }
 }
 
