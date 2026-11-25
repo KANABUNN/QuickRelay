@@ -262,9 +262,29 @@ struct ProductTags: View {
 }
 
 enum ValueText {
+    /// "M5.8", or the published text when the value is unknown ("Ｍ不明", "Ｍ８を超える巨大地震").
     static func magnitude(_ value: HypocenterDTO?) -> String? {
-        guard let magnitude = value?.magnitude else { return nil }
-        return "M" + magnitude.formatted(.number.precision(.fractionLength(1)))
+        guard let value else { return nil }
+        if let magnitude = value.magnitude {
+            return "M" + magnitude.formatted(.number.precision(.fractionLength(1)))
+        }
+        if let text = value.magnitudeText, !text.isEmpty { return text }
+        if let condition = value.magnitudeCondition, !condition.isEmpty { return "M" + condition }
+        return nil
+    }
+
+    /// JMA accuracy ranks as published, e.g. "震央 4/4 · 深さ 4 · M 2（M計算 5点）".
+    static func accuracy(_ value: HypocenterDTO?) -> String? {
+        guard let accuracy = value?.accuracy else { return nil }
+        var parts: [String] = []
+        if let epicenter = accuracy.epicenter, !epicenter.isEmpty {
+            parts.append("震央 " + epicenter + (accuracy.epicenterSecondary.map { $0.isEmpty ? "" : "/" + $0 } ?? ""))
+        }
+        if let depth = accuracy.depth, !depth.isEmpty { parts.append("深さ " + depth) }
+        if let magnitude = accuracy.magnitude, !magnitude.isEmpty { parts.append("M " + magnitude) }
+        var text = parts.joined(separator: " · ")
+        if let points = accuracy.magnitudePoints { text += "（M計算 \(points)点）" }
+        return text.isEmpty ? nil : text
     }
 
     static func coordinate(_ value: HypocenterDTO?) -> String? {

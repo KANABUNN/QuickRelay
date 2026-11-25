@@ -118,6 +118,13 @@ private struct EarthquakeHeaderSection: View {
                 if let coordinate = ValueText.coordinate(hypocenter) {
                     KeyValueRow(label: hypocenter?.label("震央") ?? "震央", value: coordinate, monospaced: true)
                 }
+                if let hypocenter, HypocenterDetailRows.hasContent(hypocenter) {
+                    DisclosureGroup {
+                        HypocenterDetailRows(value: hypocenter)
+                    } label: {
+                        Text("震源の詳細（発現時刻・精度など）").font(.subheadline)
+                    }
+                }
                 if let report = summary.hypocenterReport {
                     KeyValueRow(label: "震源の出典",
                                 value: TelegramCatalog.label(for: report) + "\n" + DisplayTime.full(report.occurredAt ?? report.receivedAt) + " 発表")
@@ -168,8 +175,11 @@ private struct EEWSection: View {
                                  reference: summary.warningReport != nil && !(summary.warningReport?.isCancelled ?? true))
             }
             if let forecast = summary.forecastReport, !forecast.isCancelled {
+                let structured = EEWPresentation.structuredAreas(forecast.eew)
                 let areas = EEWPresentation.forecastAreas(forecast)
-                if !areas.isEmpty {
+                if !structured.isEmpty {
+                    EEWAreaList(areas: structured, title: "地域別の予想（\(structured.count)地域）")
+                } else if !areas.isEmpty {
                     EEWForecastAreas(areas: areas)
                 } else if forecast.affectedAreas == nil {
                     Text("地域別の予想震度は、この版のアプリで受信した報から表示します。")
@@ -203,7 +213,7 @@ private struct EEWSection: View {
         } header: {
             Text("緊急地震速報")
         } footer: {
-            Text("予報・警報の報数は別々に数えられます。警報のマグニチュード・深さは表示しません。震動の到達までの秒読みは表示しません。")
+            Text("予報・警報の報数は別々に数えられます。警報のマグニチュード・深さは表示しません。到達予想時刻は気象庁の発表値で、震動の到達までの秒読みは表示しません。")
         }
     }
 }
@@ -226,6 +236,13 @@ private struct EEWWarningBlock: View {
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
             if !report.isCancelled {
+                let detail = report.eew
+                if let headline = detail?.headline, !headline.isEmpty {
+                    Text(headline)
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
                 if let value = report.numericHypocenter {
                     if let epicenter = value.epicenter { KeyValueRow(label: value.label("震源"), value: epicenter) }
                     if let origin = ValueText.originTime(value) {
@@ -239,20 +256,36 @@ private struct EEWWarningBlock: View {
                         Text("予想最大震度 " + intensity.displayText).font(.subheadline.weight(.semibold))
                     }
                 }
+                if let longPeriod = EEWPresentation.longPeriodText(detail?.forecastMaxLongPeriodClass) {
+                    KeyValueRow(label: "予想最大長周期地震動階級", value: longPeriod, monospaced: true)
+                }
+                let groups = EEWPresentation.warningAreaGroups(detail)
                 let areas = EEWPresentation.namedAreas(report)
-                if !areas.isEmpty {
+                if !groups.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("警報の対象地域（府県予報区・細分区域）").font(.caption).foregroundStyle(.secondary)
-                        FlowLayout(spacing: 5) {
-                            ForEach(Array(areas.enumerated()), id: \.offset) { _, name in
-                                Text(name)
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 6).padding(.vertical, 2)
-                                    .foregroundStyle(.red)
-                                    .background(Color.red.opacity(0.1), in: Capsule())
+                        Text("警報の対象地域").font(.caption).foregroundStyle(.secondary)
+                        ForEach(groups) { group in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(group.title)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 64, alignment: .leading)
+                                WarningAreaTags(names: group.names)
                             }
                         }
                     }
+                } else if !areas.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("警報の対象地域（府県予報区・細分区域）").font(.caption).foregroundStyle(.secondary)
+                        WarningAreaTags(names: areas)
+                    }
+                }
+                let structured = EEWPresentation.structuredAreas(detail)
+                if !structured.isEmpty {
+                    EEWAreaList(areas: structured, title: "警報の地域別の予想（\(structured.count)地域）", limit: 5)
+                }
+                ForEach(Array((detail?.comments ?? []).enumerated()), id: \.offset) { _, comment in
+                    NoticeBox(text: comment, systemImage: "exclamationmark.bubble", color: .red)
                 }
             } else {
                 Text(report.body).font(.subheadline).textSelection(.enabled)
@@ -300,12 +333,24 @@ private struct EEWForecastBlock: View {
                     if let coordinate = ValueText.coordinate(value) {
                         KeyValueRow(label: value.label("震央"), value: coordinate, monospaced: true)
                     }
+                    if let accuracy = ValueText.accuracy(value) {
+                        KeyValueRow(label: "震源の精度（ランク）", value: accuracy, monospaced: true)
+                    }
                 }
                 if let intensity = IntensityReading(report.maxIntensity) {
                     HStack(spacing: 10) {
                         IntensityBadge(reading: intensity, size: 34)
                         Text("予想最大震度 " + intensity.displayText).font(.subheadline.weight(.semibold))
                     }
+                }
+                if let longPeriod = EEWPresentation.longPeriodText(report.eew?.forecastMaxLongPeriodClass) {
+                    KeyValueRow(label: "予想最大長周期地震動階級", value: longPeriod, monospaced: true)
+                }
+                if let change = report.eew?.change?.description, !change.isEmpty {
+                    Label(change, systemImage: "arrow.up.arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if reference {
                     Text("同じ地震の予報から取得した値です。警報とは発表時刻が異なる場合があります。")
@@ -347,6 +392,80 @@ private struct EEWForecastAreas: View {
             names[key, default: []].append(area.name)
         }
         return order.map { AreaGroup(key: $0, names: names[$0] ?? []) }
+    }
+}
+
+/// Structured EEW forecast areas with ranges, warning flags and the published
+/// arrival time or condition. Arrival times are JMA's values, never a countdown.
+struct EEWAreaList: View {
+    let areas: [EEWAreaDTO]
+    let title: String
+    var limit = 10
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            let shown = expanded ? areas : Array(areas.prefix(limit))
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, area in
+                EEWAreaRow(area: area)
+            }
+            if areas.count > limit {
+                Button(expanded ? "折りたたむ" : "ほか\(areas.count - limit)地域を表示") { expanded.toggle() }
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+            }
+            Text("到達予想時刻は気象庁の発表値です。電文に記載された地域だけを表示します。")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct EEWAreaRow: View {
+    let area: EEWAreaDTO
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            IntensityBadge(reading: IntensityReading(area.forecastIntensity?.displayText), size: 30)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(area.name).font(.subheadline.weight(.semibold))
+                    if area.isWarning == true { StatusBadge(text: "警報", color: .red) }
+                }
+                if let arrival = EEWPresentation.arrivalText(area) {
+                    Text(arrival).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 4)
+            if let longPeriod = EEWPresentation.longPeriodText(area.forecastLongPeriodClass) {
+                let level = LongPeriodClass(area.forecastLongPeriodClass?.to == "over"
+                    ? area.forecastLongPeriodClass?.from : (area.forecastLongPeriodClass?.to ?? area.forecastLongPeriodClass?.from))
+                Text("長周期 階級" + longPeriod)
+                    .font(.caption2.weight(.bold))
+                    .monospacedDigit()
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .foregroundStyle(level?.foreground ?? Color.primary)
+                    .background(level?.fill ?? Color.gray.opacity(0.22), in: Capsule())
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct WarningAreaTags: View {
+    let names: [String]
+
+    var body: some View {
+        FlowLayout(spacing: 5) {
+            ForEach(Array(names.enumerated()), id: \.offset) { _, name in
+                Text(name)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .foregroundStyle(.red)
+                    .background(Color.red.opacity(0.1), in: Capsule())
+            }
+        }
     }
 }
 
@@ -399,6 +518,7 @@ private struct EEWHistoryGrid: View {
             if let epicenter = value.epicenter { parts.append(value.isAssumed ? epicenter + "（仮定）" : epicenter) }
             if value.status == "low_accuracy" { parts.append("低精度") }
         }
+        if let change = report.eew?.change?.shortText { parts.append(change) }
         if report.isFinal { parts.append("最終報") }
         return parts.isEmpty ? " " : parts.joined(separator: " · ")
     }
@@ -411,7 +531,7 @@ struct ObservedIntensitySection: View {
     @State private var showingAll = false
 
     var body: some View {
-        let tree = IntensityObservationTree(sections: BulletinLayout(bulletin: report.bulletin).intensitySections)
+        let tree = IntensityObservationTree(report: report)
         let groups = tree.groups(atDepth: tree.summaryDepth)
         Section {
             if let intensity = IntensityReading(report.maxIntensity) {
@@ -456,7 +576,7 @@ private struct LongPeriodSection: View {
 
     var body: some View {
         let layout = BulletinLayout(bulletin: report.bulletin)
-        let tree = IntensityObservationTree(sections: layout.intensitySections)
+        let tree = IntensityObservationTree(report: report)
         let depth = tree.nodes(atDepth: 2).contains(where: { $0.longPeriodText != nil }) ? 2 : 1
         Section {
             ForEach(Array(layout.longPeriodRows.enumerated()), id: \.offset) { _, row in
@@ -580,10 +700,18 @@ private struct IntensityNodeRow: View {
             }
             IntensityBadge(reading: node.intensity, size: indent > 0 ? 24 : 28)
             VStack(alignment: .leading, spacing: 2) {
-                Text(node.name)
-                    .font(indent > 0 ? .subheadline : .subheadline.weight(.semibold))
-                if node.svaText != nil || !node.otherRows.isEmpty {
+                HStack(spacing: 4) {
+                    Text(node.name)
+                        .font(indent > 0 ? .subheadline : .subheadline.weight(.semibold))
+                    if let revise = node.revise, !revise.isEmpty {
+                        StatusBadge(text: revise, color: .orange)
+                    }
+                }
+                if !details.isEmpty {
                     Text(details).font(.caption).foregroundStyle(.secondary)
+                }
+                if let code = node.code, !code.isEmpty {
+                    Text("コード " + code).font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
                 }
             }
             Spacer(minLength: 4)
@@ -595,7 +723,10 @@ private struct IntensityNodeRow: View {
 
     private var details: String {
         var parts: [String] = []
+        if let condition = node.extraCondition { parts.append(condition) }
         if let sva = node.svaText { parts.append("絶対速度応答 " + sva) }
+        if let classes = node.periodClassText { parts.append("周期帯別の階級 " + classes) }
+        if let values = node.periodSVAText { parts.append("周期帯別の絶対速度応答 " + values) }
         for row in node.otherRows { parts.append(row.label + " " + row.value) }
         return parts.joined(separator: " · ")
     }

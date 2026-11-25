@@ -281,8 +281,19 @@ struct RelatedEarthquakesSection: View {
     let reports: [ReportEntity]
 
     var body: some View {
+        let structured = uniqueHypocenters
         let sections = unique
-        if !sections.isEmpty {
+        if !structured.isEmpty {
+            // Structured values add the coordinates, codes and published magnitude text.
+            Section("関連する地震") {
+                ForEach(Array(structured.enumerated()), id: \.offset) { _, value in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HypocenterRows(value: value)
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        } else if !sections.isEmpty {
             Section("関連する地震") {
                 ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
                     VStack(alignment: .leading, spacing: 3) {
@@ -294,6 +305,16 @@ struct RelatedEarthquakesSection: View {
                 }
             }
         }
+    }
+
+    private var uniqueHypocenters: [HypocenterDTO] {
+        var result: [HypocenterDTO] = []
+        for report in reports.reversed() {
+            for value in report.relatedEarthquakes ?? [] where !result.contains(value) {
+                result.append(value)
+            }
+        }
+        return result
     }
 
     private var unique: [BulletinSectionDTO] {

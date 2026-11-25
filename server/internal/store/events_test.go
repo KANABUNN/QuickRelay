@@ -171,3 +171,37 @@ func TestSerial1243FinalAndDuplicateDelivery(t *testing.T) {
 		t.Fatal("outbox duplication or rollback", counts, err)
 	}
 }
+
+// Reports stored by earlier versions had no structured details. The same
+// telegram parsed by this version must still be recognised as a duplicate.
+func TestFingerprintIgnoresStructuredDetails(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now()
+	epicenter := "豊後水道"
+	legacy := report("legacy", "VXSE45", 2, now)
+	legacy.Hypocenter = &model.Hypocenter{Status: "estimated", Epicenter: &epicenter}
+	if res, err := s.Ingest(ctx, legacy); err != nil || !res.Inserted {
+		t.Fatal(res, err)
+	}
+	arrival := "2024-04-17T23:14:54+09:00"
+	detailed := legacy
+	detailed.ID, detailed.MessageID = "detailed", "detailed"
+	h := *legacy.Hypocenter
+	h.Code, h.LandOrSea, h.MagnitudeType, h.ArrivalTime = "681", "海域", "Mj", &arrival
+	h.Accuracy = &model.HypocenterAccuracy{Epicenter: "4"}
+	detailed.Hypocenter = &h
+	detailed.EEW = &model.EEWDetail{Headline: "見出し", Areas: []model.EEWArea{{Name: "愛媛県南予"}}}
+	detailed.IntensityObservation = &model.IntensityObservation{MaxIntensity: "3"}
+	detailed.RelatedEarthquakes = []model.Hypocenter{h}
+	if res, err := s.Ingest(ctx, detailed); err != nil || res.Inserted {
+		t.Fatal("structured details changed the fingerprint", res, err)
+	}
+	if legacy.Hypocenter.Code != "" || detailed.Hypocenter.Code != "681" {
+		t.Fatal("fingerprint basis modified the report")
+	}
+}

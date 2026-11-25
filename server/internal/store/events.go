@@ -29,13 +29,14 @@ func (s *Store) ingest(ctx context.Context, r model.Report, notify bool) (Ingest
 	}
 	defer tx.Rollback()
 	// Semantic duplicate protection across transport IDs; preserve corrections and terminal changes.
-	fp := r
+	// Structured fields added later are excluded to keep fingerprints computed
+	// by older installations valid.
+	fp := r.WithoutStructuredDetails()
 	fp.ID = ""
 	fp.MessageID = ""
 	fp.ReceivedAt = time.Time{}
 	fp.Raw = nil
 	fp.ServerSequence = 0
-	fp.TsunamiAreas = nil // Keep fingerprints computed by older installations valid.
 	fpBytes, _ := json.Marshal(fp)
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO reports(id,message_id,fingerprint,event_id,telegram_type,payload,raw,received_ms)
  VALUES(?,?,?,?,?,'{}',?,?)`, r.ID, r.MessageID, Hash(string(fpBytes)), r.EventID, r.TelegramType, []byte(r.Raw), r.ReceivedAt.UnixMilli())

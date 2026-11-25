@@ -173,6 +173,7 @@ func describeBulletin(e Envelope, data []byte, headline string) *model.Bulletin 
 			row(&rows, "長周期地震動階級", str(a["lgInt"]))
 			row(&rows, "最大長周期地震動階級", str(a["maxLgInt"]))
 			row(&rows, "絶対速度応答", height(a["sva"]))
+			row(&rows, "修正", str(a["revise"]))
 			addRows(join(parent, name), rows)
 			for _, key := range []string{"regions", "cities", "stations"} {
 				areas(items(a[key]), join(parent, name))

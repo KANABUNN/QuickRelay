@@ -112,6 +112,9 @@ final class ReportEntity {
     var pressTime: Date? = nil
     var validUntil: Date? = nil
     var affectedAreasData: Data? = nil
+    var eewData: Data? = nil
+    var intensityObservationData: Data? = nil
+    var relatedEarthquakesData: Data? = nil
 
     init(dto: ReportDTO, serverSequence: Int64) {
         id = dto.id
@@ -137,6 +140,9 @@ final class ReportEntity {
         pressTime = ServerDateParser.parse(dto.pressTime)
         validUntil = ServerDateParser.parse(dto.validUntil)
         affectedAreasData = dto.affectedAreas.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
+        eewData = dto.eew.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
+        intensityObservationData = dto.intensityObservation.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
+        relatedEarthquakesData = dto.relatedEarthquakes.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
     }
 
     func update(from dto: ReportDTO, serverSequence: Int64) {
@@ -162,6 +168,9 @@ final class ReportEntity {
         pressTime = ServerDateParser.parse(dto.pressTime)
         validUntil = ServerDateParser.parse(dto.validUntil)
         affectedAreasData = dto.affectedAreas.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
+        eewData = dto.eew.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
+        intensityObservationData = dto.intensityObservation.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
+        relatedEarthquakesData = dto.relatedEarthquakes.flatMap { try? JSONEncoder.quakeRelay.encode($0) }
     }
 
     var isEEW: Bool { RelayEventType(rawValue: eventType)?.isEEW == true }
@@ -178,6 +187,19 @@ final class ReportEntity {
     var affectedAreas: [AffectedAreaDTO]? {
         guard let affectedAreasData else { return nil }
         return try? JSONDecoder.quakeRelay.decode([AffectedAreaDTO].self, from: affectedAreasData)
+    }
+    /// Structured values; nil for reports parsed before the VPS provided them.
+    var eew: EEWDetailDTO? {
+        guard let eewData else { return nil }
+        return try? JSONDecoder.quakeRelay.decode(EEWDetailDTO.self, from: eewData)
+    }
+    var intensityObservation: IntensityObservationDTO? {
+        guard let intensityObservationData else { return nil }
+        return try? JSONDecoder.quakeRelay.decode(IntensityObservationDTO.self, from: intensityObservationData)
+    }
+    var relatedEarthquakes: [HypocenterDTO]? {
+        guard let relatedEarthquakesData else { return nil }
+        return try? JSONDecoder.quakeRelay.decode([HypocenterDTO].self, from: relatedEarthquakesData)
     }
 }
 

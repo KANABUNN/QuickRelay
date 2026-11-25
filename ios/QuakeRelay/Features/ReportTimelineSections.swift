@@ -111,7 +111,8 @@ struct ReportFullContent: View {
 
     var body: some View {
         let layout = BulletinLayout(bulletin: report.bulletin)
-        let tree = IntensityObservationTree(sections: layout.intensitySections)
+        let tree = IntensityObservationTree(report: report)
+        let related = report.relatedEarthquakes ?? []
         VStack(alignment: .leading, spacing: 8) {
             Group {
                 TitledText(title: "通知本文", text: report.body)
@@ -148,8 +149,13 @@ struct ReportFullContent: View {
                 ForEach(layout.tsunamiForecastSections.compactMap(TsunamiForecastEntry.init(section:))) { entry in
                     CompactTsunamiForecast(entry: entry)
                 }
-                ForEach(Array((layout.tsunamiObservationSections + layout.tsunamiEstimateSections
-                               + layout.relatedEarthquakes + layout.earthquakeCounts + layout.otherSections).enumerated()),
+                ForEach(Array(related.enumerated()), id: \.offset) { _, value in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("関連する地震").font(.subheadline.weight(.semibold))
+                        HypocenterRows(value: value)
+                    }
+                }
+                ForEach(Array(genericSections(layout, structuredRelated: !related.isEmpty).enumerated()),
                         id: \.offset) { _, section in
                     GenericSectionView(section: section)
                 }
@@ -168,6 +174,16 @@ struct ReportFullContent: View {
             IntensityObservationsView(tree: tree, title: "各地の観測")
                 .presentationDetents([.medium, .large])
         }
+    }
+
+    /// Sections shown as-is. Structured related earthquakes replace their bulletin rows.
+    private func genericSections(_ layout: BulletinLayout, structuredRelated: Bool) -> [BulletinSectionDTO] {
+        var sections: [BulletinSectionDTO] = layout.tsunamiObservationSections
+        sections += layout.tsunamiEstimateSections
+        if !structuredRelated { sections += layout.relatedEarthquakes }
+        sections += layout.earthquakeCounts
+        sections += layout.otherSections
+        return sections
     }
 }
 
@@ -192,6 +208,37 @@ struct HypocenterRows: View {
             }
             if let depth = value.depthText { KeyValueRow(label: value.label("深さ"), value: depth, monospaced: true) }
         }
+        HypocenterDetailRows(value: value)
+    }
+}
+
+/// Source details of a hypocenter, shown only when the VPS provided them.
+/// Warnings (VXSE43) never carry magnitude or depth details here.
+struct HypocenterDetailRows: View {
+    let value: HypocenterDTO
+
+    static func hasContent(_ value: HypocenterDTO) -> Bool {
+        let texts = [value.arrivalTime, value.coordinateText, value.detailedName, value.nameFromMark,
+                     value.landOrSea, value.source, value.magnitudeType, value.code]
+        return texts.contains { $0?.isEmpty == false } || ValueText.accuracy(value) != nil
+    }
+
+    var body: some View {
+        if let arrival = ServerDateParser.parse(value.arrivalTime) {
+            KeyValueRow(label: "発現時刻", value: DisplayTime.full(arrival), monospaced: true)
+        }
+        if let text = value.coordinateText, !text.isEmpty {
+            KeyValueRow(label: value.label("震源の記述"), value: text)
+        }
+        if let name = value.detailedName, !name.isEmpty { KeyValueRow(label: "詳細な震央地名", value: name) }
+        if let mark = value.nameFromMark, !mark.isEmpty { KeyValueRow(label: "震央の補足", value: mark) }
+        if let area = value.landOrSea, !area.isEmpty { KeyValueRow(label: "陸域・海域", value: area) }
+        if let source = value.source, !source.isEmpty { KeyValueRow(label: "震源の決定機関", value: source) }
+        if let type = value.magnitudeType, !type.isEmpty { KeyValueRow(label: "マグニチュードの種別", value: type, monospaced: true) }
+        if let accuracy = ValueText.accuracy(value) {
+            KeyValueRow(label: "震源の精度（ランク）", value: accuracy, monospaced: true)
+        }
+        if let code = value.code, !code.isEmpty { KeyValueRow(label: "震央地名コード", value: code, monospaced: true) }
     }
 }
 
@@ -200,7 +247,27 @@ private struct AffectedAreaRows: View {
     let report: ReportEntity
 
     var body: some View {
-        if report.isEEW {
+        if report.isEEW, let detail = report.eew, !report.isCancelled {
+            if let headline = detail.headline, !headline.isEmpty { TitledText(title: "見出し", text: headline) }
+            if let longPeriod = EEWPresentation.longPeriodText(detail.forecastMaxLongPeriodClass) {
+                KeyValueRow(label: "予想最大長周期地震動階級", value: longPeriod, monospaced: true)
+            }
+            if let change = detail.change?.description, !change.isEmpty {
+                KeyValueRow(label: "予想の変化", value: change)
+            }
+            ForEach(EEWPresentation.warningAreaGroups(detail)) { group in
+                KeyValueRow(label: "警報対象（" + group.title + "）", value: group.names.joined(separator: "、"))
+            }
+            let areas = EEWPresentation.structuredAreas(detail)
+            if !areas.isEmpty {
+                EEWAreaList(areas: areas, title: "地域別の予想（\(areas.count)地域）", limit: 8)
+            }
+            ForEach(Array((detail.comments ?? []).enumerated()), id: \.offset) { _, comment in
+                TitledText(title: "付加文", text: comment)
+            }
+        }
+        // Reports parsed before the VPS provided structured EEW values.
+        if report.isEEW && report.eew == nil {
             let forecast = EEWPresentation.forecastAreas(report)
             let named = EEWPresentation.namedAreas(report)
             if !forecast.isEmpty {
