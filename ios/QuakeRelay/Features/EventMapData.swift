@@ -87,6 +87,33 @@ enum MapDataBuilder {
         }
         let byName = Dictionary(grouping: stations, by: { nameKey($0.name) })
         var result = IntensityMapResult()
+        if !report.isCancelled, !report.isEEW, let areas = report.intensityObservation?.areas, !areas.isEmpty {
+            // Structured observations carry station codes: match by code first and
+            // fall back to the unambiguous name match used for older reports.
+            let byCode = Dictionary(grouping: stations, by: \.code)
+            func visit(_ area: ObservedAreaDTO, parent: [String]) {
+                let path = parent + [area.name]
+                if area.level == "station", let intensity = area.intensity, !intensity.isEmpty {
+                    let keys = path.map(nameKey)
+                    var candidates = area.code.flatMap { byCode[$0] } ?? []
+                    if candidates.isEmpty {
+                        candidates = (byName[nameKey(area.name)] ?? []).filter { station in
+                            keys.count <= 1 || (keys.contains(nameKey(station.cityName)) && keys.contains(nameKey(station.regionName)))
+                        }
+                    }
+                    if candidates.count == 1, let station = candidates.first {
+                        result.points.append(IntensityMapPoint(id: path.joined(separator: " / ") + "#" + (area.code ?? ""),
+                            name: station.name, intensity: intensity,
+                            coordinate: CLLocationCoordinate2D(latitude: station.latitude, longitude: station.longitude)))
+                    } else {
+                        result.unmapped += 1
+                    }
+                }
+                for child in area.children ?? [] { visit(child, parent: path) }
+            }
+            for area in areas { visit(area, parent: []) }
+            return result
+        }
         for section in observationSections(report) {
             // Bulletin hierarchy is '観測 / prefecture / region / city / station'.
             let path = section.title.components(separatedBy: " / ").map(nameKey)

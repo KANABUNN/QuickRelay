@@ -267,6 +267,8 @@ func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time
 	r.EventID = bulletinEventID(p, e.Head.Type, c.EventID, e.ID)
 	r.InfoType = c.InfoType
 	r.AffectedAreas = affectedAreas(body, e.Head.Type)
+	var top object
+	_ = json.Unmarshal(body, &top)
 	r.PressedAt = c.PressedAt
 	if c.ValidUntil != nil {
 		valid := c.ValidUntil.UTC()
@@ -313,6 +315,12 @@ func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time
 		r.Warning = false
 		return r, nil
 	}
+	if r.IsEEW() {
+		r.EEW = eewDetail(top)
+	} else {
+		r.IntensityObservation = intensityObservation(top)
+		r.RelatedEarthquakes = relatedEarthquakes(top)
+	}
 	if !r.IsEEW() && c.InfoType == "訂正" && !strings.Contains(r.Title, "訂正") {
 		r.Title += "（訂正）"
 	}
@@ -350,6 +358,7 @@ func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time
 				h.Note = "1点観測などによる精度の低い推定です。続報で大きく変わる場合があります。"
 			}
 		}
+		extendHypocenter(h, obj(at(top, "body", "earthquake")), expected == "eew.warning")
 		if expected == "eew.warning" {
 			// DMDATA's warning restriction applies to every public representation.
 			h.Magnitude, h.DepthKM, h.DepthCondition = nil, nil, ""
@@ -364,19 +373,7 @@ func normalizeConverted(e Envelope, c converted, body, raw []byte, now time.Time
 	if c.Body.Intensity != nil {
 		v := intensity(c.Body.Intensity.Max)
 		if r.IsEEW() {
-			from, to := c.Body.Intensity.Forecast.From, c.Body.Intensity.Forecast.To
-			switch {
-			case to == "over" && (from == "" || from == "不明"):
-				v = "不明"
-			case to == "over":
-				v = intensity(from) + "以上"
-			case to == "":
-				v = intensity(from)
-			case from != "" && from != to:
-				v = intensity(from) + "〜" + intensity(to)
-			default:
-				v = intensity(to)
-			}
+			v = rangeText(c.Body.Intensity.Forecast.From, c.Body.Intensity.Forecast.To)
 		}
 		r.MaxIntensity = text(v)
 	}

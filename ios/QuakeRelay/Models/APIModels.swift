@@ -50,6 +50,18 @@ struct HypocenterDTO: Codable, Equatable, Sendable {
     var depthKm: Int? = nil
     var depthCondition: String? = nil
     var magnitude: Double? = nil
+    // Source details. The VPS omits magnitude and depth details for warnings (VXSE43).
+    var code: String? = nil
+    var detailedName: String? = nil
+    var nameFromMark: String? = nil
+    var source: String? = nil
+    var landOrSea: String? = nil
+    var coordinateText: String? = nil
+    var magnitudeType: String? = nil
+    var magnitudeCondition: String? = nil
+    var magnitudeText: String? = nil
+    var arrivalTime: String? = nil
+    var accuracy: HypocenterAccuracyDTO? = nil
 
     var isAssumed: Bool { status == "assumed" }
     var qualification: String? {
@@ -125,6 +137,10 @@ struct ReportDTO: Codable, Equatable, Sendable {
     var validUntil: String? = nil
     // Region names with their maximum (EEW: forecast) intensity, as normalized by the VPS.
     var affectedAreas: [AffectedAreaDTO]? = nil
+    // Structured telegram values; absent for reports parsed by older VPS versions.
+    var eew: EEWDetailDTO? = nil
+    var intensityObservation: IntensityObservationDTO? = nil
+    var relatedEarthquakes: [HypocenterDTO]? = nil
 
     var numericHypocenter: HypocenterDTO? {
         if let hypocenter { return hypocenter }
@@ -138,6 +154,126 @@ struct ReportDTO: Codable, Equatable, Sendable {
 struct AffectedAreaDTO: Codable, Equatable, Sendable {
     var name: String
     var maxIntensity: String? = nil
+}
+
+/// JMA Hypocenter/Accuracy rank codes, as published.
+struct HypocenterAccuracyDTO: Codable, Equatable, Sendable {
+    var epicenter: String? = nil
+    var epicenterSecondary: String? = nil
+    var depth: String? = nil
+    var magnitude: String? = nil
+    var magnitudePoints: Int? = nil
+}
+
+/// Forecast range; `to` may be "over" (from or more). `text` is the display form.
+struct IntensityRangeDTO: Codable, Equatable, Sendable {
+    var from: String? = nil
+    var to: String? = nil
+    var text: String? = nil
+
+    var displayText: String? {
+        if let text, !text.isEmpty { return text }
+        if to == "over", let from { return from + "以上" }
+        if let from, let to, from != to { return from + "〜" + to }
+        return to ?? from
+    }
+}
+
+/// Forecast/Appendix: change of the forecast maximum and its reason (codes).
+struct EEWChangeDTO: Codable, Equatable, Sendable {
+    var maxIntensity: String? = nil
+    var maxLongPeriodClass: String? = nil
+    var reason: String? = nil
+    var description: String? = nil
+
+    /// Compact label for the report-by-report table, e.g. "震度↑（M変化）".
+    var shortText: String? {
+        var parts: [String] = []
+        let intensityLabels = ["1": "震度↑", "2": "震度↓"]
+        let longPeriodLabels = ["1": "長周期↑", "2": "長周期↓"]
+        let reasonLabels = ["1": "M変化", "2": "震央変化", "3": "M・震央変化", "4": "深さ変化", "9": "PLUM法"]
+        if let label = intensityLabels[maxIntensity ?? ""] { parts.append(label) }
+        if let label = longPeriodLabels[maxLongPeriodClass ?? ""] { parts.append(label) }
+        guard !parts.isEmpty else { return nil }
+        let reasonText = reasonLabels[reason ?? ""]
+        return parts.joined(separator: "・") + (reasonText.map { "（" + $0 + "）" } ?? "")
+    }
+}
+
+/// A warning target area listed in the headline.
+struct EEWZoneDTO: Codable, Equatable, Sendable {
+    /// zone (地方予報区), prefecture (府県予報区) or region (細分区域).
+    var level: String
+    var name: String
+    var code: String? = nil
+}
+
+/// One forecast area of an EEW.
+struct EEWAreaDTO: Codable, Equatable, Sendable {
+    var prefecture: String? = nil
+    var prefectureCode: String? = nil
+    var name: String
+    var code: String? = nil
+    var kind: String? = nil
+    var kindCode: String? = nil
+    var isWarning: Bool? = nil
+    var forecastIntensity: IntensityRangeDTO? = nil
+    var forecastLongPeriodClass: IntensityRangeDTO? = nil
+    /// Published expected arrival time of the principal motion. Never shown as a countdown.
+    var arrivalTime: String? = nil
+    var condition: String? = nil
+}
+
+struct EEWDetailDTO: Codable, Equatable, Sendable {
+    var headline: String? = nil
+    var forecastMaxIntensity: IntensityRangeDTO? = nil
+    var forecastMaxLongPeriodClass: IntensityRangeDTO? = nil
+    var change: EEWChangeDTO? = nil
+    var warningAreas: [EEWZoneDTO]? = nil
+    var areas: [EEWAreaDTO]? = nil
+    var comments: [String]? = nil
+}
+
+struct MeasurementDTO: Codable, Equatable, Sendable {
+    var value: Double? = nil
+    var unit: String? = nil
+    var condition: String? = nil
+
+    var displayText: String? {
+        if let value { return value.formatted(.number.precision(.fractionLength(0...2))) + (unit ?? "") }
+        return condition
+    }
+}
+
+/// One period band of a long-period ground motion station (VXSE62).
+struct LongPeriodBandDTO: Codable, Equatable, Sendable {
+    var band: String
+    var periodUnit: String? = nil
+    var longPeriodClass: String? = nil
+    var sva: Double? = nil
+    var svaUnit: String? = nil
+}
+
+/// One node of the observed intensity hierarchy.
+struct ObservedAreaDTO: Codable, Equatable, Sendable {
+    /// prefecture, region, city or station.
+    var level: String
+    var name: String
+    var code: String? = nil
+    var intensity: String? = nil
+    var longPeriodClass: String? = nil
+    var condition: String? = nil
+    var revise: String? = nil
+    var sva: MeasurementDTO? = nil
+    var periods: [LongPeriodBandDTO]? = nil
+    var children: [ObservedAreaDTO]? = nil
+}
+
+struct IntensityObservationDTO: Codable, Equatable, Sendable {
+    var maxIntensity: String? = nil
+    var maxLongPeriodClass: String? = nil
+    var longPeriodCategory: String? = nil
+    var areas: [ObservedAreaDTO]? = nil
 }
 
 struct SyncItemDTO: Codable, Equatable, Sendable {

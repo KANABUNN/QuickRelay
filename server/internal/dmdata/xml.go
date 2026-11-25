@@ -262,6 +262,13 @@ func parseXML(data []byte, code string, p product) (converted, []byte, error) {
 			}
 			if key == "Forecast" {
 				details["forecastMaxInt"] = xmlRange(n.child("ForecastInt"))
+				if lg := n.child("ForecastLgInt"); lg != nil {
+					details["forecastMaxLgInt"] = xmlRange(lg)
+				}
+				if ap := n.child("Appendix"); ap != nil {
+					details["appendix"] = object{"maxIntChange": ap.get("MaxIntChange"), "maxLgIntChange": ap.get("MaxLgIntChange"),
+						"maxIntChangeReason": ap.get("MaxIntChangeReason")}
+				}
 			}
 			for _, field := range []string{"MaxInt", "MaxLgInt", "LgCategory"} {
 				details[lowerFirst(field)] = n.get(field)
@@ -375,6 +382,9 @@ func xmlEarthquake(eq *xmlNode) object {
 		if n.attr("type") != "" {
 			continue
 		}
+		if coords["description"] == nil && n.attr("description") != "" {
+			coords["description"] = n.attr("description")
+		}
 		m := coordinatePattern.FindStringSubmatch(n.value())
 		if len(m) == 0 {
 			continue
@@ -412,10 +422,19 @@ func xmlEarthquake(eq *xmlNode) object {
 		}
 	}
 	magnitude := xmlScalar(selected)
-	return object{"originTime": text(eq.get("OriginTime")), "condition": eq.get("Condition"), "magnitude": magnitude,
-		"hypocenter": object{"name": a.get("Name"), "coordinate": coords, "depth": depth,
-			"accuracy": object{"epicenters": []string{ac.child("Epicenter").attr("rank"), ac.child("Epicenter").attr("rank2")},
-				"magnitudeCalculation": ac.child("MagnitudeCalculation").attr("rank")}}}
+	magnitude["type"], magnitude["description"] = selected.attr("type"), selected.attr("description")
+	source := h.get("Source")
+	if source == "" {
+		source = a.get("Source")
+	}
+	hypocenter := object{"name": a.get("Name"), "code": a.get("Code"), "coordinate": coords, "depth": depth,
+		"detailed": object{"name": a.get("DetailedName"), "code": a.get("DetailedCode")}, "nameFromMark": a.get("NameFromMark"),
+		"source": source, "landOrSea": a.get("LandOrSea"),
+		"accuracy": object{"epicenters": []string{ac.child("Epicenter").attr("rank"), ac.child("Epicenter").attr("rank2")},
+			"depth": ac.child("Depth").attr("rank"), "magnitudeCalculation": ac.child("MagnitudeCalculation").attr("rank"),
+			"numberOfMagnitudeCalculation": ac.get("NumberOfMagnitudeCalculation")}}
+	return object{"originTime": text(eq.get("OriginTime")), "arrivalTime": eq.get("ArrivalTime"), "condition": eq.get("Condition"),
+		"magnitude": magnitude, "hypocenter": hypocenter}
 }
 
 func xmlScalar(n *xmlNode) object {
@@ -429,14 +448,35 @@ func xmlScalar(n *xmlNode) object {
 
 func xmlIntensityArea(n *xmlNode) object {
 	out := object{"name": n.get("Name"), "code": n.get("Code")}
-	for _, key := range []string{"MaxInt", "Int", "MaxLgInt", "LgInt"} {
+	for _, key := range []string{"MaxInt", "Int", "MaxLgInt", "LgInt", "Condition", "Revise", "ArrivalTime"} {
 		out[lowerFirst(key)] = n.get(key)
+	}
+	// JMA omits MaxInt for municipalities whose intensity of 5- or more is not yet
+	// received; "!5-" is the existing representation of that state.
+	if out["maxInt"] == "" && out["int"] == "" && strings.Contains(n.get("Condition"), "未入電") {
+		out["maxInt"] = "!5-"
 	}
 	if f := n.child("ForecastInt"); f != nil {
 		out["forecastMaxInt"] = xmlRange(f)
 	}
+	if f := n.child("ForecastLgInt"); f != nil {
+		out["forecastMaxLgInt"] = xmlRange(f)
+	}
+	if k := n.child("Category").child("Kind"); k != nil {
+		out["kind"] = object{"name": k.get("Name"), "code": k.get("Code")}
+	}
 	if s := n.child("Sva"); s != nil {
 		out["sva"] = xmlScalar(s)
+	}
+	var periods []any
+	for _, p := range n.list("LgIntPerPeriod") {
+		periods = append(periods, object{"band": p.attr("PeriodicBand"), "periodUnit": p.attr("PeriodUnit"), "lgInt": p.value()})
+	}
+	for _, p := range n.list("SvaPerPeriod") {
+		periods = append(periods, object{"band": p.attr("PeriodicBand"), "periodUnit": p.attr("PeriodUnit"), "sva": xmlScalar(p)})
+	}
+	if len(periods) > 0 {
+		out["perPeriod"] = periods
 	}
 	for _, pair := range [][2]string{{"Area", "regions"}, {"City", "cities"}, {"IntensityStation", "stations"}} {
 		var values []any

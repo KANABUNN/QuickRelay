@@ -12,7 +12,9 @@ final class PresentationTests: XCTestCase {
                         category: String = "earthquake", revision: Int? = nil, cancelled: Bool = false,
                         final: Bool = false, occurredAt: String = "2026-11-20T03:00:00Z",
                         maxIntensity: String? = nil, hypocenter: HypocenterDTO? = nil,
-                        areas: [AffectedAreaDTO]? = nil, sections: [BulletinSectionDTO] = []) -> ReportEntity {
+                        areas: [AffectedAreaDTO]? = nil, sections: [BulletinSectionDTO] = [],
+                        eew: EEWDetailDTO? = nil, observation: IntensityObservationDTO? = nil,
+                        related: [HypocenterDTO]? = nil) -> ReportEntity {
         let isEEW = ["VXSE43", "VXSE44", "VXSE45"].contains(type)
         var dto = ReportDTO(id: id, eventId: eventID, serverSequence: UInt64(sequence),
             messageId: "message-" + id,
@@ -30,6 +32,9 @@ final class PresentationTests: XCTestCase {
         dto.hypocenter = hypocenter
         dto.affectedAreas = areas
         dto.bulletin = BulletinDTO(sections: sections)
+        dto.eew = eew
+        dto.intensityObservation = observation
+        dto.relatedEarthquakes = related
         return ReportEntity(dto: dto, serverSequence: sequence)
     }
 
@@ -114,6 +119,89 @@ final class PresentationTests: XCTestCase {
         let listed = anchors.flatMap { [$0] + $0.descendants }.map(\.id)
         XCTAssertEqual(Set(listed).count, tree.allNodes.count - 1, "All nodes below the prefecture are listed")
         XCTAssertEqual(tree.leafGroups.first?.names, ["合成観測地点01"])
+    }
+
+    func testStructuredObservationKeepsCodesConditionsRevisionsAndPeriods() throws {
+        let station = ObservedAreaDTO(level: "station", name: "合成観測点", code: "0000001", intensity: "4",
+            longPeriodClass: "3", sva: MeasurementDTO(value: 20.5, unit: "cm/s"),
+            periods: [LongPeriodBandDTO(band: "1", periodUnit: "秒台", longPeriodClass: "2", sva: 20.5, svaUnit: "cm/s"),
+                      LongPeriodBandDTO(band: "2", periodUnit: "秒台", longPeriodClass: "3", sva: 50.3, svaUnit: "cm/s")])
+        let unreceived = ObservedAreaDTO(level: "city", name: "未入電町", code: "0000002", intensity: "5弱以上未入電",
+                                         condition: "震度５弱以上未入電")
+        let added = ObservedAreaDTO(level: "city", name: "追加町", code: "0000003", intensity: "4", revise: "追加",
+                                    children: [station])
+        let observation = IntensityObservationDTO(maxIntensity: "5弱", areas: [
+            ObservedAreaDTO(level: "prefecture", name: "合成県", code: "99", intensity: "5弱", children: [
+                ObservedAreaDTO(level: "region", name: "合成地方", code: "999", intensity: "5弱", children: [unreceived, added]),
+            ]),
+        ])
+        // The structured tree replaces the bulletin sections when present.
+        let entity = report("structured", sequence: 1, type: "VXSE53", maxIntensity: "5弱",
+                            sections: observationSections, observation: observation)
+        XCTAssertEqual(entity.intensityObservation, observation, "Persisted values must round-trip unchanged")
+        let tree = IntensityObservationTree(report: entity)
+        XCTAssertEqual(tree.roots.map(\.name), ["合成県"])
+        XCTAssertEqual(tree.summaryDepth, 2)
+        let nodes = Dictionary(uniqueKeysWithValues: tree.allNodes.map { ($0.name, $0) })
+        let city = try XCTUnwrap(nodes["未入電町"])
+        XCTAssertTrue(city.intensity?.notReceived == true)
+        XCTAssertNil(city.extraCondition, "未入電 is already shown by the badge")
+        XCTAssertEqual(nodes["追加町"]?.revise, "追加")
+        let leaf = try XCTUnwrap(nodes["合成観測点"])
+        XCTAssertEqual(leaf.path, ["合成県", "合成地方", "追加町", "合成観測点"])
+        XCTAssertEqual(leaf.code, "0000001")
+        XCTAssertEqual(leaf.svaText, "20.5cm/s")
+        XCTAssertEqual(leaf.periodClassText, "1秒台 2 / 2秒台 3")
+        XCTAssertEqual(leaf.periodSVAText, "1秒台 20.5 / 2秒台 50.3（cm/s）")
+
+        // Older reports without the structured value still use the bulletin sections.
+        let legacy = report("legacy", sequence: 2, type: "VXSE53", maxIntensity: "4", sections: observationSections)
+        XCTAssertEqual(IntensityObservationTree(report: legacy).allNodes.count, observationSections.count + 1)
+    }
+
+    func testStructuredEEWAreasKeepRangesArrivalTimesAndChanges() throws {
+        let detail = EEWDetailDTO(headline: "合成見出し",
+            forecastMaxIntensity: IntensityRangeDTO(from: "5弱", to: "5弱", text: "5弱"),
+            forecastMaxLongPeriodClass: IntensityRangeDTO(from: "1", to: "1", text: "1"),
+            change: EEWChangeDTO(maxIntensity: "1", maxLongPeriodClass: "0", reason: "1", description: "合成説明"),
+            warningAreas: [EEWZoneDTO(level: "zone", name: "合成地方"), EEWZoneDTO(level: "region", name: "合成細分")],
+            areas: [
+                EEWAreaDTO(name: "合成地域B", isWarning: false, forecastIntensity: IntensityRangeDTO(from: "3", to: "4", text: "3〜4"),
+                           arrivalTime: "2026-11-20T03:00:12Z"),
+                EEWAreaDTO(name: "合成地域A", isWarning: true, forecastIntensity: IntensityRangeDTO(from: "5弱", to: "over", text: "5弱以上"),
+                           forecastLongPeriodClass: IntensityRangeDTO(from: "0", to: "0", text: "0"), condition: "既に主要動到達と推測"),
+            ],
+            comments: ["強い揺れに警戒してください。"])
+        let forecast = report("eew", sequence: 1, type: "VXSE45", revision: 2, maxIntensity: "5弱以上",
+            areas: [AffectedAreaDTO(name: "旧形式", maxIntensity: "4")], eew: detail)
+        XCTAssertEqual(forecast.eew, detail)
+        XCTAssertEqual(EEWPresentation.forecastAreas(forecast).map(\.name), ["合成地域A", "合成地域B"])
+        XCTAssertEqual(EEWPresentation.forecastAreas(forecast).map(\.maxIntensity), ["5弱以上", "3〜4"])
+        let areas = EEWPresentation.structuredAreas(detail)
+        XCTAssertEqual(areas.map(\.name), ["合成地域A", "合成地域B"])
+        XCTAssertEqual(EEWPresentation.arrivalText(areas[0]), "既に主要動到達と推測")
+        XCTAssertEqual(EEWPresentation.arrivalText(areas[1]),
+                       "到達予想 " + DisplayTime.time(try XCTUnwrap(ServerDateParser.parse("2026-11-20T03:00:12Z"))))
+        XCTAssertNil(EEWPresentation.longPeriodText(areas[0].forecastLongPeriodClass), "Class 0 is not displayed")
+        XCTAssertEqual(EEWPresentation.longPeriodText(detail.forecastMaxLongPeriodClass), "1")
+        XCTAssertEqual(EEWPresentation.warningAreaGroups(detail).map(\.title), ["地方", "細分区域"])
+        XCTAssertEqual(detail.change?.shortText, "震度↑（M変化）")
+        XCTAssertNil(EEWChangeDTO(maxIntensity: "0", maxLongPeriodClass: "0", reason: "0").shortText)
+        XCTAssertEqual(IntensityRangeDTO(from: "4", to: "over").displayText, "4以上")
+    }
+
+    func testPublishedMagnitudeTextAndAccuracyAreShownAsPublished() {
+        let unknown = HypocenterDTO(status: "estimated", magnitudeCondition: "不明", magnitudeText: "Ｍ８を超える巨大地震")
+        XCTAssertEqual(ValueText.magnitude(unknown), "Ｍ８を超える巨大地震")
+        XCTAssertEqual(ValueText.magnitude(HypocenterDTO(status: "estimated", magnitudeCondition: "不明")), "M不明")
+        XCTAssertEqual(ValueText.magnitude(HypocenterDTO(status: "estimated", magnitude: 5.8, magnitudeText: "Ｍ５．８")), "M5.8")
+        let ranked = HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(epicenter: "4", epicenterSecondary: "4",
+                                                                                      depth: "4", magnitude: "2", magnitudePoints: 5))
+        XCTAssertEqual(ValueText.accuracy(ranked), "震央 4/4 · 深さ 4 · M 2（M計算 5点）")
+        XCTAssertEqual(ValueText.accuracy(HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(epicenter: "1"))), "震央 1")
+        XCTAssertNil(ValueText.accuracy(HypocenterDTO(status: "estimated")))
+        XCTAssertTrue(HypocenterDetailRows.hasContent(ranked))
+        XCTAssertFalse(HypocenterDetailRows.hasContent(HypocenterDTO(status: "estimated")))
     }
 
     func testEarthquakeSummaryUsesLatestHypocenterAndSkipsCancelledProducts() throws {

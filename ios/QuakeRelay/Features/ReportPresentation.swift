@@ -199,8 +199,37 @@ struct IntensityNode: Identifiable {
     let svaText: String?
     let otherRows: [BulletinRowDTO]
     let children: [IntensityNode]
+    // Only available from the structured observation (intensity_observation).
+    var code: String? = nil
+    var condition: String? = nil
+    var revise: String? = nil
+    var periods: [LongPeriodBandDTO] = []
 
     var depth: Int { path.count }
+
+    /// Condition text not already conveyed by the intensity badge (e.g. 未入電).
+    var extraCondition: String? {
+        guard let condition, !condition.isEmpty else { return nil }
+        if intensity?.notReceived == true && condition.contains("未入電") { return nil }
+        return condition
+    }
+
+    /// "1秒台 2 / 2秒台 3 …" for long-period stations.
+    var periodClassText: String? {
+        let parts = periods.compactMap { band in
+            band.longPeriodClass.map { band.band + (band.periodUnit ?? "") + " " + $0 }
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " / ")
+    }
+
+    var periodSVAText: String? {
+        let parts = periods.compactMap { band in
+            band.sva.map { band.band + (band.periodUnit ?? "") + " " + $0.formatted(.number.precision(.fractionLength(0...2))) }
+        }
+        guard !parts.isEmpty else { return nil }
+        let unit = periods.compactMap(\.svaUnit).first ?? ""
+        return parts.joined(separator: " / ") + (unit.isEmpty ? "" : "（" + unit + "）")
+    }
     var longPeriod: LongPeriodClass? { LongPeriodClass(longPeriodText) }
     var parentPath: [String] { Array(path.dropLast()) }
 
@@ -223,9 +252,35 @@ struct IntensityGroup: Identifiable {
     var names: [String] { nodes.map(\.name) }
 }
 
-/// Prefecture → region → municipality → station hierarchy from "観測 / …" sections.
+/// Prefecture → region → municipality → station hierarchy, from the structured
+/// observation when the VPS provided it, otherwise from "観測 / …" sections.
 struct IntensityObservationTree {
     let roots: [IntensityNode]
+
+    init(report: ReportEntity) {
+        if let areas = report.intensityObservation?.areas, !areas.isEmpty {
+            self.init(areas: areas)
+        } else {
+            self.init(sections: BulletinLayout(bulletin: report.bulletin).intensitySections)
+        }
+    }
+
+    init(areas: [ObservedAreaDTO]) {
+        func build(_ area: ObservedAreaDTO, parent: [String]) -> IntensityNode {
+            let path = parent + [area.name]
+            let longPeriod = area.longPeriodClass?.isEmpty == false ? area.longPeriodClass : nil
+            return IntensityNode(id: path.joined(separator: " / ") + (area.code.map { "#" + $0 } ?? ""),
+                                 name: area.name, path: path,
+                                 intensity: IntensityReading(area.intensity),
+                                 longPeriodText: longPeriod,
+                                 svaText: area.sva?.displayText,
+                                 otherRows: [],
+                                 children: (area.children ?? []).map { build($0, parent: path) },
+                                 code: area.code, condition: area.condition, revise: area.revise,
+                                 periods: area.periods ?? [])
+        }
+        roots = areas.map { build($0, parent: []) }
+    }
 
     init(sections: [BulletinSectionDTO]) {
         let root = Builder(path: [])
@@ -364,9 +419,16 @@ enum EEWPresentation {
         }
     }
 
-    /// Forecast areas with a known intensity, strongest first.
+    /// Forecast areas with a known intensity, strongest first. Structured EEW
+    /// areas keep the published range (e.g. 3〜4); older reports use affected_areas.
     static func forecastAreas(_ report: ReportEntity) -> [AffectedAreaDTO] {
-        (report.affectedAreas ?? []).filter { IntensityReading($0.maxIntensity)?.isKnown == true }
+        let source: [AffectedAreaDTO]
+        if let areas = report.eew?.areas, !areas.isEmpty {
+            source = areas.map { AffectedAreaDTO(name: $0.name, maxIntensity: $0.forecastIntensity?.displayText) }
+        } else {
+            source = report.affectedAreas ?? []
+        }
+        return source.filter { IntensityReading($0.maxIntensity)?.isKnown == true }
             .enumerated()
             .sorted {
                 let a = IntensityReading.sortKey(IntensityReading($0.element.maxIntensity))
@@ -379,6 +441,45 @@ enum EEWPresentation {
     /// Area names without intensity (VXSE43 target areas, or prefecture containers).
     static func namedAreas(_ report: ReportEntity) -> [String] {
         (report.affectedAreas ?? []).filter { IntensityReading($0.maxIntensity)?.isKnown != true }.map(\.name)
+    }
+
+    /// Structured forecast areas, strongest first, keeping the telegram order within a class.
+    static func structuredAreas(_ detail: EEWDetailDTO?) -> [EEWAreaDTO] {
+        (detail?.areas ?? []).enumerated().sorted {
+            let a = IntensityReading.sortKey(IntensityReading($0.element.forecastIntensity?.displayText))
+            let b = IntensityReading.sortKey(IntensityReading($1.element.forecastIntensity?.displayText))
+            return a != b ? a > b : $0.offset < $1.offset
+        }.map { $0.element }
+    }
+
+    struct AreaGroup: Identifiable {
+        let title: String
+        let names: [String]
+        var id: String { title }
+    }
+
+    /// Warning target areas grouped by level: 地方, 府県予報区, 細分区域.
+    static func warningAreaGroups(_ detail: EEWDetailDTO?) -> [AreaGroup] {
+        let areas = detail?.warningAreas ?? []
+        var groups: [AreaGroup] = []
+        for (level, title) in [("zone", "地方"), ("prefecture", "府県予報区"), ("region", "細分区域")] {
+            let names = areas.filter { $0.level == level }.map(\.name)
+            if !names.isEmpty { groups.append(AreaGroup(title: title, names: names)) }
+        }
+        return groups
+    }
+
+    /// "到達予想 23:15:02" (JMA's published time, not a countdown) or the published condition.
+    static func arrivalText(_ area: EEWAreaDTO) -> String? {
+        if let condition = area.condition, !condition.isEmpty { return condition }
+        guard let date = ServerDateParser.parse(area.arrivalTime) else { return nil }
+        return "到達予想 " + DisplayTime.time(date)
+    }
+
+    /// Long-period class worth showing: absent or class 0 is not displayed.
+    static func longPeriodText(_ range: IntensityRangeDTO?) -> String? {
+        guard let text = range?.displayText, !text.isEmpty, text != "0" else { return nil }
+        return text
     }
 }
 

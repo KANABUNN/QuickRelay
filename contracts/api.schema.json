@@ -177,6 +177,19 @@
               "last_kind": {"type": "string"}
             }
           }
+        },
+        "eew": {
+          "$ref": "#/$defs/EEWDetail"
+        },
+        "intensity_observation": {
+          "$ref": "#/$defs/IntensityObservation"
+        },
+        "related_earthquakes": {
+          "type": "array",
+          "description": "Earthquakes attached to tsunami and advisory bulletins (non-earthquake categories).",
+          "items": {
+            "$ref": "#/$defs/Hypocenter"
+          }
         }
       }
     },
@@ -544,6 +557,46 @@
             "number",
             "null"
           ]
+        },
+        "code": {
+          "type": "string",
+          "description": "JMA epicenter name code (震央地名コード)."
+        },
+        "detailed_name": {
+          "type": "string"
+        },
+        "name_from_mark": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "description": "Determining agency for distant earthquakes, as published."
+        },
+        "land_or_sea": {
+          "type": "string"
+        },
+        "coordinate_text": {
+          "type": "string",
+          "description": "Published coordinate description. Omitted for VXSE43 because it states the depth."
+        },
+        "magnitude_type": {
+          "type": "string",
+          "description": "Omitted for VXSE43."
+        },
+        "magnitude_condition": {
+          "type": "string",
+          "description": "For example 不明. Omitted for VXSE43."
+        },
+        "magnitude_text": {
+          "type": "string",
+          "description": "Published magnitude description, for example Ｍ８を超える巨大地震. Omitted for VXSE43."
+        },
+        "arrival_time": {
+          "type": "string",
+          "description": "Earthquake/ArrivalTime (発現時刻)."
+        },
+        "accuracy": {
+          "$ref": "#/$defs/HypocenterAccuracy"
         }
       }
     },
@@ -612,6 +665,7 @@
         "format": {
           "enum": [
             "json",
+            "xml",
             "a/n",
             "binary"
           ]
@@ -648,6 +702,291 @@
         },
         "max_intensity": {
           "type": "string"
+        }
+      }
+    },
+    "HypocenterAccuracy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "JMA Hypocenter/Accuracy rank codes as published. VXSE43 carries only the epicenter ranks.",
+      "properties": {
+        "epicenter": {
+          "type": "string"
+        },
+        "epicenter_secondary": {
+          "type": "string"
+        },
+        "depth": {
+          "type": "string"
+        },
+        "magnitude": {
+          "type": "string"
+        },
+        "magnitude_points": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "IntensityRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string",
+          "description": "May be \"over\" (from or more)."
+        },
+        "text": {
+          "type": "string",
+          "description": "Display form, for example 4〜5弱 or 5弱以上."
+        }
+      }
+    },
+    "EEWChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Forecast/Appendix codes (MaxIntChange, MaxLgIntChange, MaxIntChangeReason).",
+      "properties": {
+        "max_intensity": {
+          "type": "string"
+        },
+        "max_long_period_class": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "description": "Japanese explanation; present only when a maximum changed."
+        }
+      }
+    },
+    "EEWZone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "name"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "zone",
+            "prefecture",
+            "region"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "EEWArea": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "is_warning"
+      ],
+      "properties": {
+        "prefecture": {
+          "type": "string"
+        },
+        "prefecture_code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "kind_code": {
+          "type": "string"
+        },
+        "is_warning": {
+          "type": "boolean"
+        },
+        "forecast_intensity": {
+          "$ref": "#/$defs/IntensityRange"
+        },
+        "forecast_long_period_class": {
+          "$ref": "#/$defs/IntensityRange"
+        },
+        "arrival_time": {
+          "type": "string",
+          "description": "Published expected arrival time of the principal motion. Not a countdown."
+        },
+        "condition": {
+          "type": "string",
+          "description": "For example 既に主要動到達と推測."
+        }
+      }
+    },
+    "EEWDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "EEW values not represented by the summary fields. Never contains magnitude or depth.",
+      "properties": {
+        "headline": {
+          "type": "string"
+        },
+        "forecast_max_intensity": {
+          "$ref": "#/$defs/IntensityRange"
+        },
+        "forecast_max_long_period_class": {
+          "$ref": "#/$defs/IntensityRange"
+        },
+        "change": {
+          "$ref": "#/$defs/EEWChange"
+        },
+        "warning_areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EEWZone"
+          }
+        },
+        "areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EEWArea"
+          }
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "condition": {
+          "type": "string"
+        }
+      }
+    },
+    "LongPeriodBand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band"
+      ],
+      "properties": {
+        "band": {
+          "type": "string"
+        },
+        "period_unit": {
+          "type": "string"
+        },
+        "long_period_class": {
+          "type": "string"
+        },
+        "sva": {
+          "type": "number"
+        },
+        "sva_unit": {
+          "type": "string"
+        }
+      }
+    },
+    "ObservedArea": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "name"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "prefecture",
+            "region",
+            "city",
+            "station"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "intensity": {
+          "type": "string"
+        },
+        "long_period_class": {
+          "type": "string"
+        },
+        "condition": {
+          "type": "string",
+          "description": "For example 震度５弱以上未入電."
+        },
+        "revise": {
+          "type": "string",
+          "description": "上方修正 or 追加."
+        },
+        "sva": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "periods": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LongPeriodBand"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObservedArea"
+          }
+        }
+      }
+    },
+    "IntensityObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Intensity/Observation as a tree with codes. Bulletin sections remain for older clients.",
+      "properties": {
+        "max_intensity": {
+          "type": "string"
+        },
+        "max_long_period_class": {
+          "type": "string"
+        },
+        "long_period_category": {
+          "type": "string"
+        },
+        "areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObservedArea"
+          }
         }
       }
     }

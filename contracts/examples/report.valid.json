@@ -20,5 +20,15 @@
   "longitude": 131.7,
   "depth_km": 30,
   "magnitude": 5.7,
-  "max_intensity": "5弱"
+  "max_intensity": "5弱",
+  "eew": {
+    "forecast_max_intensity": {"from": "5弱", "to": "5弱", "text": "5弱"},
+    "forecast_max_long_period_class": {"from": "1", "to": "1", "text": "1"},
+    "change": {"max_intensity": "1", "max_long_period_class": "0", "reason": "1", "description": "最大予想震度が1.0以上大きくなりました。理由：主としてMが変化したため。"},
+    "areas": [
+      {"prefecture": "宮崎", "prefecture_code": "9450", "name": "宮崎県南部平野部", "code": "771", "kind": "緊急地震速報（予報）", "kind_code": "20", "is_warning": false,
+       "forecast_intensity": {"from": "4", "to": "5弱", "text": "4〜5弱"}, "forecast_long_period_class": {"from": "0", "to": "1", "text": "0〜1"},
+       "arrival_time": "2026-10-05T09:00:12+09:00"}
+    ]
+  }
 }

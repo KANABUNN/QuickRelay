@@ -18,6 +18,18 @@ type Hypocenter struct {
 	DepthKM        *int     `json:"depth_km"`
 	DepthCondition string   `json:"depth_condition,omitempty"`
 	Magnitude      *float64 `json:"magnitude"`
+	// Optional source details. Warnings (VXSE43) omit magnitude and depth details.
+	Code               string              `json:"code,omitempty"`
+	DetailedName       string              `json:"detailed_name,omitempty"`
+	NameFromMark       string              `json:"name_from_mark,omitempty"`
+	Source             string              `json:"source,omitempty"`
+	LandOrSea          string              `json:"land_or_sea,omitempty"`
+	CoordinateText     string              `json:"coordinate_text,omitempty"`
+	MagnitudeType      string              `json:"magnitude_type,omitempty"`
+	MagnitudeCondition string              `json:"magnitude_condition,omitempty"`
+	MagnitudeText      string              `json:"magnitude_text,omitempty"`
+	ArrivalTime        *string             `json:"arrival_time,omitempty"`
+	Accuracy           *HypocenterAccuracy `json:"accuracy,omitempty"`
 }
 
 func (h Hypocenter) Qualification() string {
@@ -34,38 +46,42 @@ func (h Hypocenter) Qualification() string {
 }
 
 type Report struct {
-	ID             string          `json:"id"`
-	EventID        string          `json:"event_id"`
-	ServerSequence int64           `json:"server_sequence"`
-	MessageID      string          `json:"message_id"`
-	Classification string          `json:"classification"`
-	TelegramType   string          `json:"telegram_type"`
-	EventType      string          `json:"event_type"`
-	Serial         *int            `json:"revision"`
-	Final          bool            `json:"is_final"`
-	Cancelled      bool            `json:"is_cancelled"`
-	Warning        bool            `json:"is_warning"`
-	Title          string          `json:"title"`
-	Body           string          `json:"body"`
-	ReportedAt     time.Time       `json:"occurred_at"`
-	ReceivedAt     time.Time       `json:"received_at"`
-	OriginTime     *string         `json:"origin_time"`
-	Epicenter      *string         `json:"epicenter"`
-	Latitude       *float64        `json:"latitude"`
-	Longitude      *float64        `json:"longitude"`
-	DepthKM        *int            `json:"depth_km"`
-	Magnitude      *float64        `json:"magnitude"`
-	MaxIntensity   *string         `json:"max_intensity"`
-	Hypocenter     *Hypocenter     `json:"hypocenter,omitempty"`
-	Category       string          `json:"category,omitempty"`
-	SourceEventID  string          `json:"source_event_id,omitempty"`
-	InfoType       string          `json:"info_type,omitempty"`
-	PressedAt      *time.Time      `json:"press_time,omitempty"`
-	ValidUntil     *time.Time      `json:"valid_until,omitempty"`
-	Bulletin       *Bulletin       `json:"bulletin,omitempty"`
-	AffectedAreas  []AffectedArea  `json:"affected_areas,omitempty"`
-	TsunamiAreas   []TsunamiArea   `json:"tsunami_areas,omitempty"`
-	Raw            json.RawMessage `json:"-"`
+	ID             string         `json:"id"`
+	EventID        string         `json:"event_id"`
+	ServerSequence int64          `json:"server_sequence"`
+	MessageID      string         `json:"message_id"`
+	Classification string         `json:"classification"`
+	TelegramType   string         `json:"telegram_type"`
+	EventType      string         `json:"event_type"`
+	Serial         *int           `json:"revision"`
+	Final          bool           `json:"is_final"`
+	Cancelled      bool           `json:"is_cancelled"`
+	Warning        bool           `json:"is_warning"`
+	Title          string         `json:"title"`
+	Body           string         `json:"body"`
+	ReportedAt     time.Time      `json:"occurred_at"`
+	ReceivedAt     time.Time      `json:"received_at"`
+	OriginTime     *string        `json:"origin_time"`
+	Epicenter      *string        `json:"epicenter"`
+	Latitude       *float64       `json:"latitude"`
+	Longitude      *float64       `json:"longitude"`
+	DepthKM        *int           `json:"depth_km"`
+	Magnitude      *float64       `json:"magnitude"`
+	MaxIntensity   *string        `json:"max_intensity"`
+	Hypocenter     *Hypocenter    `json:"hypocenter,omitempty"`
+	Category       string         `json:"category,omitempty"`
+	SourceEventID  string         `json:"source_event_id,omitempty"`
+	InfoType       string         `json:"info_type,omitempty"`
+	PressedAt      *time.Time     `json:"press_time,omitempty"`
+	ValidUntil     *time.Time     `json:"valid_until,omitempty"`
+	Bulletin       *Bulletin      `json:"bulletin,omitempty"`
+	AffectedAreas  []AffectedArea `json:"affected_areas,omitempty"`
+	TsunamiAreas   []TsunamiArea  `json:"tsunami_areas,omitempty"`
+	// Structured source values; see WithoutStructuredDetails for fingerprints.
+	EEW                  *EEWDetail            `json:"eew,omitempty"`
+	IntensityObservation *IntensityObservation `json:"intensity_observation,omitempty"`
+	RelatedEarthquakes   []Hypocenter          `json:"related_earthquakes,omitempty"`
+	Raw                  json.RawMessage       `json:"-"`
 }
 
 func (r Report) IsEEW() bool {

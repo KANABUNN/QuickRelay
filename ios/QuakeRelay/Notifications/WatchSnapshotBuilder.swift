@@ -102,7 +102,7 @@ enum WatchSnapshotBuilder {
             detail.longPeriodClass = clip(summary.maxLongPeriodText, 8)
             detail.originTime = ServerDateParser.parse(hypocenter?.originTime)
             if !warningOnly {
-                detail.magnitude = ValueText.magnitude(hypocenter).map { hypocenter?.isAssumed == true ? $0 + "（仮定）" : $0 }
+                detail.magnitude = clip(ValueText.magnitude(hypocenter).map { hypocenter?.isAssumed == true ? $0 + "（仮定）" : $0 }, 24)
                 detail.depth = hypocenter?.depthText
             }
             detail.hypocenterNote = clip(hypocenter?.qualification, 80)
@@ -113,7 +113,7 @@ enum WatchSnapshotBuilder {
                 detail.comment = clip(BulletinLayout(bulletin: report.bulletin).text(.warningComment), 120)
             }
             if let report = summary.observedReport {
-                let tree = IntensityObservationTree(sections: BulletinLayout(bulletin: report.bulletin).intensitySections)
+                let tree = IntensityObservationTree(report: report)
                 let nodes = tree.groups(atDepth: tree.summaryDepth).flatMap(\.nodes)
                 let areas = nodes.prefix(areaLimit).compactMap { node in
                     node.intensity.map { WatchAreaIntensity(name: String(node.name.prefix(24)), intensity: $0.displayText) }
