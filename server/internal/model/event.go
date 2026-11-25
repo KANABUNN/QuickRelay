@@ -117,17 +117,19 @@ func (r Report) NewerThan(p Report) bool {
 		}
 		return false
 	}
-	if r.Serial != nil && p.Serial != nil {
-		if *r.Serial != *p.Serial {
-			return *r.Serial > *p.Serial && !(p.IsEEW() && (p.Cancelled || p.Final && !r.Cancelled))
-		}
-	}
 	// Cancellation is terminal within its own telegram stream; it does not cancel other products.
+	// It is decided before serials so a cancellation numbered below a report already
+	// received (gap or reordering between routes) still ends the stream.
 	if p.Cancelled {
 		return false
 	}
 	if r.Cancelled {
 		return true
+	}
+	if r.Serial != nil && p.Serial != nil {
+		if *r.Serial != *p.Serial {
+			return *r.Serial > *p.Serial && !(p.IsEEW() && p.Final)
+		}
 	}
 	if p.Final && !r.Final {
 		return false

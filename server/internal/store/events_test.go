@@ -82,6 +82,57 @@ func TestOrderingCancellationStreamsAndSync(t *testing.T) {
 	}
 }
 
+func TestCancellationWithLowerSerialEndsStream(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now()
+	for _, tc := range []struct {
+		name string
+		typ  string
+	}{{"forecast", "VXSE45"}, {"warning", "VXSE43"}} {
+		latest := report(tc.name+"-r5", tc.typ, 5, now)
+		latest.EventID = "evt-" + tc.name
+		if tc.typ == "VXSE43" {
+			latest.Classification = "eew.warning"
+			latest.Warning = true
+		}
+		if res, err := s.Ingest(ctx, latest); err != nil || !res.Current {
+			t.Fatal(tc.name, "latest", res, err)
+		}
+		cancel := latest
+		cancel.ID, cancel.MessageID = tc.name+"-cancel4", tc.name+"-cancel4"
+		cancel.Serial = new(int)
+		*cancel.Serial = 4
+		cancel.Cancelled, cancel.Final = true, true
+		cancel.EventType = "eew_cancel"
+		cancel.ReportedAt = now.Add(time.Second)
+		cancel.ReceivedAt = cancel.ReportedAt
+		if res, err := s.Ingest(ctx, cancel); err != nil || !res.Current {
+			t.Fatal(tc.name, "lower-serial cancel ignored", res, err)
+		}
+		late := latest
+		late.ID, late.MessageID = tc.name+"-r3", tc.name+"-r3"
+		late.Serial = new(int)
+		*late.Serial = 3
+		late.ReportedAt = now.Add(2 * time.Second)
+		late.ReceivedAt = late.ReportedAt
+		if res, err := s.Ingest(ctx, late); err != nil || res.Current {
+			t.Fatal(tc.name, "late report revived cancelled stream", res, err)
+		}
+		e, _, err := s.Event(ctx, latest.EventID)
+		if err != nil || !e.Cancelled || e.SourceSerial == nil || *e.SourceSerial != 4 {
+			t.Fatal(tc.name, "event state", e, err)
+		}
+		if superseded, err := s.Superseded(ctx, latest, false); err != nil || !superseded {
+			t.Fatal(tc.name, "pending delivery of cancelled report not superseded", superseded, err)
+		}
+	}
+}
+
 func TestOutboxFailureRollsBackReport(t *testing.T) {
 	ctx := context.Background()
 	s, err := Open(filepath.Join(t.TempDir(), "db"))
