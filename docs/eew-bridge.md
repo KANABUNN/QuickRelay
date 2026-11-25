@@ -1,0 +1,130 @@
+# EEW ブリッジの状態管理
+
+読み上げ用の別プログラムへ配信する緊急地震速報（EEW）の状態を、QuickRelay とは別のデータベース（`bridge.db`）で管理します。このページでは、電文の解析、系列の状態遷移、配信ログ、複製 DB を使った無音検証を説明します。ライブの受け渡しは [EEW ブリッジへの受け渡し](eew-handoff.md)、WSS 配信と配備は後続で追加します。
+
+| 場所 | 担当 |
+| --- | --- |
+| `server/internal/dmdata/eew.go` | `ParseEEW`。VXSE45・VXSE43 の XML 原電文を解析する。上限と XML の制限は既存の `Normalize` と同じ。 |
+| `server/internal/eew` | 状態の型と状態遷移（`Apply`）。入出力を持たない。 |
+| `server/internal/eewbridge` | `bridge.db` への保存、配信ログ、保持期間の整理、無音検証。 |
+| `server/cmd/eew-bridge` | `verify` コマンド。 |
+
+## 対象の電文
+
+- VXSE45 を予報系列（`forecast`）、VXSE43 を警報系列（`warning`）とする。系列は電文種別で決め、VXSE45 の警報区分は警報系列に使わない。
+- XML 原電文（DMDATA の `format=xml`）だけを扱う。JSON 変換の電文は隔離する。
+- 訓練・試験、DMDATA の試験配信、VXSE44、その他の電文は無視する（`ignored`）。
+- イベントのキーは `(environment, Head/EventID)`。v1 の `environment` は `production` だけ。
+
+## 状態遷移
+
+系列ごとに独立して更新します。片方の系列の更新は、もう片方の状態・改訂番号・出典を変えません。
+
+| 入力 | 結果 |
+| --- | --- |
+| 通常報（発表）で、報数が適用済みより大きい | 適用する。予報の最終報（`NextAdvisory`）なら `final`。報数の飛びは待たない。 |
+| 報数が適用済みより小さい | `stale`。状態は変えない。 |
+| 報数が同じで内容も同じ | `duplicate`。 |
+| 報数が同じで内容が違う | 隔離（`same_serial_conflict`）。 |
+| 取消済みの系列への通常報 | 取消の報数以下なら `stale`、それより大きければ隔離（`after_cancel`）。 |
+| 最終報後の予報の通常報 | 報数が大きければ隔離（`after_final`）。 |
+| 明示取消 | QuickRelay が確定した取消（受け渡しの `applied.is_cancelled=true`）だけを適用する。報数の大小や最終報の有無は問わない。先着の取消も記録する。 |
+| 取消済みの系列への取消 | `duplicate`（`already_canceled`）。 |
+| 訂正報、報数のない通常報 | 隔離。初版では置換規則を適用しない。 |
+| 同じ電文 ID で本文が違う | 隔離（`telegram_id_conflict`）。 |
+| 発表から 1 時間を超えて届いたライブの報 | 状態を変えない（`too_old`）。無音検証では適用する。 |
+
+予報の最終報で、警報やイベントは終わりません。時間の経過や地域の脱落から取消を推定することもありません。
+
+## 警報地域の累積
+
+VXSE43 の `Head/Headline/Information` のうち、`Kind=31` の地域を `(codeType, code)` で管理します。
+
+- `reportRegions` は当該報に載った地域。`addedRegions` は当該報で追加された地域（`LastKind=00`）。
+- `activeRegions` はこれまでの累積。地域を減らすことはない。
+- 累積の各地域には、追加した報の電文 ID（`sourceRef`）と音声開始期限（`speechUntil`）を付ける。期限は続報で延長しない。
+- `regionSources` は `sourceRef` が指す過去の報の出典。
+- 次の場合は `coverage=partial` にし、以後 `complete` に戻さない。
+  - ブリッジが受けていない報で警報済みの地域（`LastKind=31`）が載っている。その地域の `sourceRef` と `speechUntil` は `null`。
+  - 警報の続報との間で、上流の接続世代が変わった。
+
+## 音声開始期限
+
+期限は報の `Head/ReportDateTime` から計算します。
+
+- 予報：10 秒
+- 警報：15 秒。警報地域は、その地域を追加した報から 15 秒。
+- 明示取消：30 秒
+- 予報の最終報：`null`（発話の候補にしない）
+
+発表時刻が VPS の受信時刻より 1 分以上先なら、時計の異常として期限を `null` にします。
+
+## イベントの JSON
+
+配信する状態は `server/internal/eew/types.go` の JSON タグに従います。改訂番号と報数は 10 進文字列、時刻は UTC の RFC 3339 です。
+
+```json
+{
+  "eventId": "20240417231454", "environment": "production", "revision": "3",
+  "forecast": {
+    "status": "canceled", "revision": "2",
+    "source": {"issuer": "JMA", "provider": "DMDATA", "code": "VXSE45", "telegramId": "…", "serial": "5",
+               "infoType": "cancel", "issuedAt": "…", "sentAt": null, "receivedAt": "…", "controlAt": "…", "origin": "live"},
+    "data": null, "speechUntil": "…"
+  },
+  "warning": {
+    "status": "active", "revision": "1", "source": {"…": "…"},
+    "data": {
+      "reportRegions": [{"codeType": "地震情報／細分区域", "code": "622", "name": "愛媛県南予", "level": "region"}],
+      "addedRegions": [{"codeType": "地震情報／細分区域", "code": "622", "name": "愛媛県南予", "level": "region"}],
+      "activeRegions": [{"codeType": "地震情報／細分区域", "code": "622", "name": "愛媛県南予", "level": "region",
+                         "sourceRef": "…", "speechUntil": "…"}],
+      "regionSources": [], "coverage": "complete"
+    },
+    "speechUntil": "…"
+  }
+}
+```
+
+予報の `data` は次の項目を持ちます。
+
+- `originTime`、`magnitude`、`depthKm`
+- `hypocenter`：`code`、`name`、緯度経度、`quality`
+- `maxIntensity`、`maxLongPeriodClass`
+- `regionForecasts`：地域ごとの予想震度、長周期地震動階級、到達情報
+
+`quality.kind` は `estimated`、`assumed`（仮定震源要素・レベル法）、`lowAccuracy`（1 点観測など）のいずれかです。`assumed` のとき、`originTime`・`magnitude`・`depthKm` は仮の値なので `null` にします。震度の `kind` は `exact`、`range`、`lowerBound`、`unknown` のいずれかで、不明を 0 として扱いません。到達情報は `condition`（`predicted`、`arrived`、`noPrediction`、`unknown`）と時刻を分けて持ちます。警報の `data` には規模・深さ・予想震度を含めません。
+
+## bridge.db
+
+| テーブル | 内容 |
+| --- | --- |
+| `events` | イベントごとの配信状態（上の JSON）と、適用済みの報数などの管理情報。 |
+| `inputs` | 入力フレームごとの結果（`applied`、`duplicate`、`stale`、`not_applied`、`ignored`、`quarantined`）と理由。重複判定と隔離の記録を兼ねる。 |
+| `streams` / `stream_log` | 配信ストリームの `epoch`・最終連番と、状態が変わるたびに追記する配信ログ。v1 のストリームは `eew-production`。 |
+
+1 件の入力の適用、記録、配信ログへの追記は、同じトランザクションで確定します。同じフレームを再処理しても状態は変わりません。保持期間は配信ログが 15 分または 10,000 件、イベントと入力の記録が 24 時間です。
+
+## 複製 DB による無音検証
+
+QuickRelay のバックアップから作った複製 DB を使い、ブリッジの状態を QuickRelay の判定と比べます。音声も配信も出しません。
+
+```sh
+cd server
+go build -o .local/eew-bridge ./cmd/eew-bridge
+.local/eew-bridge verify -source-db /path/to/relay-copy.db
+```
+
+複製 DB は読み取り専用で開きます。稼働中の DB ファイルを直接指定せず、`quakerelay backup` や運用バックアップで作った複製を使ってください。`-state-db` を付けると、作ったブリッジ DB を残せます（既存のファイルは使いません）。`-json` で JSON を出力します。
+
+検証では、`reports` の VXSE43・VXSE45 を確定順に `historical` として適用します。QuickRelay が各報を系列に確定したかどうかは、現在の `Report.NewerThan` で計算し直します。
+
+| 出力 | 意味 |
+| --- | --- |
+| 結果の内訳 | `applied`、`stale:older_serial` など、結果と理由ごとの件数。 |
+| Series mismatches | 系列の最終状態（状態と報数）がブリッジと QuickRelay で違うもの。 |
+| Applied disagreements | QuickRelay が確定したのにブリッジが適用しなかった報、またはその逆。 |
+| Stored relay streams decided differently today | 保存済みの `streams` が、現在の判定と違うもの。#15 より前に旧報扱いされた取消など。参考情報で、終了コードには影響しない。 |
+| Quarantined | 隔離した報と理由。 |
+
+終了コードは、一致すれば 0、mismatch か disagreement があれば 3、それ以外のエラーは 1 です。
