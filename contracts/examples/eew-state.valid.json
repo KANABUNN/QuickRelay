@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "type": "eew.state",
+  "streamId": "eew-production",
+  "epoch": "g0123456789abcdef",
+  "seq": "1052",
+  "delivery": "live",
+  "cause": "telegram",
+  "committedAt": "2026-11-24T03:00:20.100Z",
+  "changedSeries": "warning",
+  "event": {
+    "eventId": "20261124120000",
+    "environment": "production",
+    "revision": "5",
+    "forecast": {
+      "status": "active",
+      "revision": "3",
+      "source": {
+        "issuer": "JMA", "provider": "DMDATA", "code": "VXSE45", "telegramId": "demo-f04", "serial": "4",
+        "infoType": "issue", "issuedAt": "2026-11-24T03:00:18Z", "sentAt": null,
+        "receivedAt": "2026-11-24T03:00:18.07Z", "controlAt": "2026-11-24T03:00:18Z", "origin": "live"
+      },
+      "data": {
+        "originTime": "2026-11-24T03:00:00Z",
+        "hypocenter": {
+          "code": "000", "name": "例示震央", "latitude": 35.0, "longitude": 139.0,
+          "quality": {"kind": "estimated", "epicenterRank": "4", "epicenterRank2": "4", "depthRank": "4", "magnitudeRank": "4", "magnitudePoints": 5}
+        },
+        "magnitude": 6.1,
+        "depthKm": 30,
+        "maxIntensity": {"kind": "range", "min": "5-", "max": "5+"},
+        "maxLongPeriodClass": {"kind": "exact", "value": "1"},
+        "regionForecasts": [
+          {
+            "codeType": "地震情報／細分区域", "code": "000", "name": "例示地域", "prefectureCode": "0000", "prefectureName": "例示県",
+            "kindCode": "10", "kindName": "緊急地震速報（警報）", "isWarning": true,
+            "maxIntensity": {"kind": "exact", "value": "5+"}, "maxLongPeriodClass": {"kind": "exact", "value": "1"},
+            "arrival": {"time": "2026-11-24T03:00:25Z", "condition": "predicted"}
+          }
+        ]
+      },
+      "speechUntil": "2026-11-24T03:00:28Z"
+    },
+    "warning": {
+      "status": "active",
+      "revision": "2",
+      "source": {
+        "issuer": "JMA", "provider": "DMDATA", "code": "VXSE43", "telegramId": "demo-w05", "serial": "5",
+        "infoType": "issue", "issuedAt": "2026-11-24T03:00:20Z", "sentAt": null,
+        "receivedAt": "2026-11-24T03:00:20.06Z", "controlAt": "2026-11-24T03:00:20Z", "origin": "live"
+      },
+      "data": {
+        "reportRegions": [
+          {"codeType": "地震情報／細分区域", "code": "000", "name": "例示地域", "level": "region"},
+          {"codeType": "地震情報／細分区域", "code": "001", "name": "例示地域二", "level": "region"}
+        ],
+        "addedRegions": [
+          {"codeType": "地震情報／細分区域", "code": "001", "name": "例示地域二", "level": "region"}
+        ],
+        "activeRegions": [
+          {"codeType": "地震情報／細分区域", "code": "000", "name": "例示地域", "level": "region",
+           "sourceRef": "demo-w02", "speechUntil": "2026-11-24T03:00:27Z"},
+          {"codeType": "地震情報／細分区域", "code": "001", "name": "例示地域二", "level": "region",
+           "sourceRef": "demo-w05", "speechUntil": "2026-11-24T03:00:35Z"}
+        ],
+        "regionSources": [
+          {
+            "issuer": "JMA", "provider": "DMDATA", "code": "VXSE43", "telegramId": "demo-w02", "serial": "2",
+            "infoType": "issue", "issuedAt": "2026-11-24T03:00:12Z", "sentAt": null,
+            "receivedAt": "2026-11-24T03:00:12.06Z", "controlAt": "2026-11-24T03:00:12Z", "origin": "live"
+          }
+        ],
+        "coverage": "complete"
+      },
+      "speechUntil": "2026-11-24T03:00:35Z"
+    }
+  }
+}

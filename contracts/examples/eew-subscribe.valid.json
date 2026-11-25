@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "type": "subscribe",
+  "environment": "production",
+  "resume": {"streamId": "eew-production", "epoch": "g0123456789abcdef", "seq": "1051"}
+}

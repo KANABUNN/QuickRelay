@@ -30,7 +30,11 @@ const StreamProduction = "eew-production"
 
 var ErrInvalid = errors.New("invalid bridge input")
 
-type Store struct{ DB *sql.DB }
+type Store struct {
+	DB *sql.DB
+	// changed wakes delivery sessions after a log append or an epoch change.
+	changed signal
+}
 
 func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -158,6 +162,9 @@ func (s *Store) Process(ctx context.Context, in Input, now time.Time) (Outcome, 
 	err = tx.QueryRowContext(ctx, "SELECT outcome FROM inputs WHERE receipt_id=?", out.ReceiptID).Scan(&seen)
 	if err == nil {
 		out.Result = eew.Result{Outcome: eew.Duplicate, Reason: "receipt_seen"}
+		if err = advanceCursor(ctx, tx, in); err != nil {
+			return out, err
+		}
 		return out, tx.Commit()
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -184,7 +191,25 @@ func (s *Store) Process(ctx context.Context, in Input, now time.Time) (Outcome, 
 	if err = row.insert(ctx, tx, out, now); err != nil {
 		return out, err
 	}
-	return out, tx.Commit()
+	if err = advanceCursor(ctx, tx, in); err != nil {
+		return out, err
+	}
+	if err = tx.Commit(); err != nil {
+		return out, err
+	}
+	if out.LogSeq > 0 {
+		s.changed.fire()
+	}
+	return out, nil
+}
+
+// advanceCursor records the hand-off position with the input it came from.
+func advanceCursor(ctx context.Context, tx *sql.Tx, in Input) error {
+	if in.Seq <= 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, "UPDATE handoff_cursor SET seq=?,receipt_id=? WHERE id=1 AND seq<?", in.Seq, in.ReceiptID, in.Seq)
+	return err
 }
 
 func (s *Store) apply(ctx context.Context, tx *sql.Tx, t eew.Telegram, in Input, now time.Time) (eew.Result, int64, error) {

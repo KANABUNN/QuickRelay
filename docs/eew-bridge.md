@@ -1,13 +1,23 @@
-# EEW ブリッジの状態管理
+# EEW ブリッジの状態管理と WSS 配信
 
-読み上げ用の別プログラムへ配信する緊急地震速報（EEW）の状態を、QuickRelay とは別のデータベース（`bridge.db`）で管理します。このページでは、電文の解析、系列の状態遷移、配信ログ、複製 DB を使った無音検証を説明します。ライブの受け渡しは [EEW ブリッジへの受け渡し](eew-handoff.md)、WSS 配信と配備は後続で追加します。
+読み上げ用の別プログラムへ配信する緊急地震速報（EEW）の状態を、QuickRelay とは別のサービス（`eew-bridge`）とデータベース（`bridge.db`）で管理し、WSS で配信します。このページでは次の内容を説明します。
+
+- 電文の解析と系列の状態遷移
+- 配信ログ
+- 受け渡しの取込
+- WSS の契約
+- 運用コマンド
+- 複製 DB を使った無音検証
+
+QuickRelay 側の受け渡しは [EEW ブリッジへの受け渡し](eew-handoff.md) を参照してください。systemd と Caddy の配備は後続で追加します。
 
 | 場所 | 担当 |
 | --- | --- |
 | `server/internal/dmdata/eew.go` | `ParseEEW`。VXSE45・VXSE43 の XML 原電文を解析する。上限と XML の制限は既存の `Normalize` と同じ。 |
 | `server/internal/eew` | 状態の型と状態遷移（`Apply`）。入出力を持たない。 |
-| `server/internal/eewbridge` | `bridge.db` への保存、配信ログ、保持期間の整理、無音検証。 |
-| `server/cmd/eew-bridge` | `verify` コマンド。 |
+| `server/internal/eewbridge` | `bridge.db`、受け渡しの取込（`Feeder`）、WSS 配信（`Server`）、端末トークン、ヘルス、無音検証。 |
+| `server/cmd/eew-bridge` | `serve`、`token`、`rotate-epoch`、`verify` コマンド。 |
+| `contracts/eew-wss.schema.json` | WSS メッセージの JSON Schema。例は `contracts/examples/eew-*.valid.json`。 |
 
 ## 対象の電文
 
@@ -104,6 +114,65 @@ VXSE43 の `Head/Headline/Information` のうち、`Kind=31` の地域を `(code
 | `streams` / `stream_log` | 配信ストリームの `epoch`・最終連番と、状態が変わるたびに追記する配信ログ。v1 のストリームは `eew-production`。 |
 
 1 件の入力の適用、記録、配信ログへの追記は、同じトランザクションで確定します。同じフレームを再処理しても状態は変わりません。保持期間は配信ログが 15 分または 10,000 件、イベントと入力の記録が 24 時間です。
+
+## 受け渡しの取込
+
+`eew-bridge serve` は QuickRelay の受け渡しソケットを long-poll で読み（待機 4 秒）、行ごとに適用します。受け渡し位置は、入力の記録と同じトランザクションで `bridge.db` に保存します。
+
+| 状況 | 動作 |
+| --- | --- |
+| 起動時・再接続時 | 最初に読んだ時点の最新位置までの行を `origin=recovered`、それより後を `origin=live` とする。 |
+| QuickRelay の DMDATA 接続世代が変わった | 進行中の警報の累積を `partial` にし、`cause=reconcile` で配信する。 |
+| 読む前に行が削除された（`gap`） | 同じく `partial` にし、配信ログの `epoch` を新しくする。端末はスナップショットで状態を置き換える。 |
+| QuickRelay の DB が復元された（409） | 位置を先頭に戻して残っている行を読み直し、`epoch` を新しくする。処理済みのフレームは重複として扱う。 |
+| ソケットに接続できない | 0.5〜5 秒の間隔で再試行する。その間 `capture` は `degraded` になる。 |
+
+## WSS の契約
+
+`wss://<ホスト>/v1/eew`。Caddy が TLS を終端し、`127.0.0.1:9082` に転送します。メッセージの形は [contracts/eew-wss.schema.json](../contracts/eew-wss.schema.json) が正です。
+
+1. 接続時に `Authorization: Bearer <端末トークン>` を送る。トークンが無い・違う・失効している場合は 401。
+2. 接続後 5 秒以内に `subscribe` を送る。`resume` には前回保存したカーソルを入れ、初回は `null`。
+3. サーバーは `sync_begin` を送る。カーソルが今の `epoch` の保持範囲内なら `mode=resume`、それ以外は `mode=snapshot`。
+4. resume では、カーソルの次から `asOfSeq` までの `eew.state` を `delivery=replay` で送る。snapshot では、直近 10 分に更新されたイベントを `snapshot` の各パートで送る（状態が空でも 1 パート送る）。
+5. サーバーは `sync_complete` を送る。`cursor.seq` は `asOfSeq` と同じ。端末はここで状態とカーソルを一緒に確定する。
+6. その後は、新しい確定ごとに `eew.state` を `delivery=live` で送る。`health` は 5 秒ごとと、状態が変わったときに送る。
+
+`health` の `upstream` は QuickRelay の DMDATA 受信、`capture` はブリッジの受け渡しの取込を表します。最後に確認してから 10 秒を過ぎた情報は `degraded` とします。
+
+上限は、1 フレーム 256 KiB、同期の合計 4 MiB、同期の所要時間 10 秒です。resume が 4 MiB を超える場合は snapshot に切り替えます。接続数は全体で 32、1 トークンあたり 4 です。認証の失敗が 1 分間に 20 回に達すると、それ以降の接続を 429 で断ります。
+
+| クローズコード | 意味と端末の対応 |
+| --- | --- |
+| 1000 | 正常終了。 |
+| 1001 | サービスの停止。再接続する。 |
+| 4400 | `subscribe` がない、形が違う、または対応していない `schemaVersion`。 |
+| 4403 | トークンが許可していない `environment`。設定を直す。 |
+| 4408 | `subscribe` または同期が時間内に終わらなかった。再接続する。 |
+| 4409 | `epoch` が変わった、またはログの保持範囲から外れた。再接続して同期し直す。 |
+| 4410 | トークンが失効した。新しいトークンが必要。 |
+| 4413 | フレームまたは同期が上限を超えた。 |
+| 4429 | 送信が詰まった（1 フレームの書き込みが 5 秒を超えた）。再接続する。 |
+
+## 運用
+
+設定は環境変数、または `-env-file` で指定するファイル（`KEY=value` 形式）で渡します。
+
+| キー | 既定値 |
+| --- | --- |
+| `EEW_BRIDGE_DATABASE` | `/var/lib/quick-relay-bridge/bridge.db` |
+| `EEW_BRIDGE_LISTEN` | `127.0.0.1:9082`（ループバックのみ） |
+| `EEW_HANDOFF_SOCKET` | `/run/quick-relay-handoff/handoff.sock` |
+
+```sh
+eew-bridge serve
+eew-bridge token issue -name "居間の PC"   # トークンは一度だけ表示する。DB には SHA-256 だけを保存する
+eew-bridge token list
+eew-bridge token revoke t_xxxxxxxxxxxx     # 接続中のセッションは 5 秒以内に 4410 で閉じる
+eew-bridge rotate-epoch                    # bridge.db をバックアップから戻した後に実行する
+```
+
+`GET /healthz`（ループバック）は `upstream`、`capture`、セッション数、`epoch`、最終連番を返します。両方が `healthy` のときだけ 200 です。
 
 ## 複製 DB による無音検証
 

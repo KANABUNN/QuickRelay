@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "type": "health",
+  "serverTime": "2026-11-24T03:00:21.000Z",
+  "upstream": "healthy",
+  "capture": "healthy"
+}
