@@ -38,6 +38,9 @@ const (
 )
 
 // Speech may start only until these limits after the report's issue time.
+// QuickRelay Voice rejects a deadline further out and starts speech by the
+// earlier of the two, so a longer limit needs the receiver changed first; a
+// shorter one takes effect from the bridge alone.
 const (
 	ForecastSpeechLimit = 10 * time.Second
 	WarningSpeechLimit  = 15 * time.Second
@@ -96,13 +99,16 @@ type Telegram struct {
 }
 
 type HypocenterQuality struct {
-	// estimated, assumed (仮定震源要素・レベル法) or lowAccuracy (1点観測など).
-	Kind            string `json:"kind"`
-	EpicenterRank   string `json:"epicenterRank,omitempty"`
-	EpicenterRank2  string `json:"epicenterRank2,omitempty"`
-	DepthRank       string `json:"depthRank,omitempty"`
-	MagnitudeRank   string `json:"magnitudeRank,omitempty"`
-	MagnitudePoints *int   `json:"magnitudePoints,omitempty"`
+	// estimated, assumed (仮定震源要素・レベル法) or lowAccuracy (IPF法1点).
+	Kind string `json:"kind"`
+	// JMA rank codes as published.
+	EpicenterRank  string `json:"epicenterRank,omitempty"`
+	EpicenterRank2 string `json:"epicenterRank2,omitempty"`
+	DepthRank      string `json:"depthRank,omitempty"`
+	MagnitudeRank  string `json:"magnitudeRank,omitempty"`
+	// JMA NumberOfMagnitudeCalculation code 1–5; 5 means five or more stations.
+	// Absent when JMA gives 0 (unknown), never zero.
+	MagnitudePoints *int `json:"magnitudePoints,omitempty"`
 }
 
 type Hypocenter struct {
