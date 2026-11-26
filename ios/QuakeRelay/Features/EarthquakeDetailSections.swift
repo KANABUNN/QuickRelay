@@ -292,6 +292,8 @@ private struct EEWWarningBlock: View {
             }
         }
         .padding(.vertical, 2)
+        // The heading Label would otherwise start the separator after its icon.
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }
 
@@ -359,6 +361,8 @@ private struct EEWForecastBlock: View {
             }
         }
         .padding(.vertical, 2)
+        // The heading Label would otherwise start the separator after its icon.
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }
 
@@ -531,8 +535,6 @@ private struct EEWHistoryGrid: View {
                         .font(.caption2)
                         .foregroundStyle(report.isCancelled ? Color.orange : Color.secondary)
                         .gridCellColumns(9)
-                        // Wraps within the columns instead of widening them.
-                        .gridCellUnsizedAxes(.horizontal)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -542,10 +544,11 @@ private struct EEWHistoryGrid: View {
     /// Empty column between two value columns. When spread, every gap takes an
     /// equal share of the spare width; its ideal width equals the compact gap,
     /// so `ViewThatFits` falls back exactly when the natural widths do not fit.
+    /// It has no height, so it never affects the height of a row.
     private func gapCell(_ spread: Bool) -> some View {
         Color.clear
-            .frame(minWidth: Self.gap, idealWidth: Self.gap, maxWidth: spread ? .infinity : Self.gap)
-            .gridCellUnsizedAxes(.vertical)
+            .frame(minWidth: Self.gap, idealWidth: Self.gap, maxWidth: spread ? .infinity : Self.gap,
+                   minHeight: 0, idealHeight: 0, maxHeight: 0)
     }
 
     private func rowNote(_ report: ReportEntity) -> String {
