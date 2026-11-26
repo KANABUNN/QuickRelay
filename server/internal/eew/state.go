@@ -120,7 +120,9 @@ func Apply(prev *State, t Telegram, c Context) (State, Result) {
 			next := &ForecastSeries{Status: StatusActive, Revision: revision + 1, Source: source(t, c), Data: t.Forecast,
 				SpeechUntil: deadline(t, c, ForecastSpeechLimit)}
 			if t.Final {
-				// A final forecast offers no speech; it never ends the warning or the event.
+				// A final forecast carries no deadline; reading it is up to the receiver.
+				// QuickRelay Voice reads it within the forecast limit but rejects a final
+				// forecast that has a deadline. It never ends the warning or the event.
 				next.Status, next.SpeechUntil = StatusFinal, nil
 			}
 			s.Event.Forecast = next

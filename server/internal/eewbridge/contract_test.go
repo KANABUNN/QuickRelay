@@ -18,7 +18,7 @@ import (
 
 // schemaCheck validates the subset of JSON Schema used by contracts/eew-wss.schema.json:
 // $ref, oneOf, allOf, type, const, enum, required, properties, items, pattern,
-// minLength and minimum. format is not checked.
+// minLength, minimum and maximum. format is not checked.
 type schemaCheck struct{ root map[string]any }
 
 func loadSchema(t *testing.T) schemaCheck {
@@ -126,6 +126,9 @@ func (c schemaCheck) validate(s map[string]any, v any, path string) error {
 	if n, ok := v.(float64); ok {
 		if m, ok := s["minimum"].(float64); ok && n < m {
 			return fmt.Errorf("%s: below minimum", path)
+		}
+		if m, ok := s["maximum"].(float64); ok && n > m {
+			return fmt.Errorf("%s: above maximum", path)
 		}
 	}
 	if obj, ok := v.(map[string]any); ok {
@@ -257,6 +260,10 @@ func TestSchemaCheckRejectsDrift(t *testing.T) {
 		},
 		"bad intensity": func(m map[string]any) {
 			m["event"].(map[string]any)["forecast"].(map[string]any)["data"].(map[string]any)["maxIntensity"] = map[string]any{"kind": "big"}
+		},
+		"unknown magnitude points as zero": func(m map[string]any) {
+			hypocenter := m["event"].(map[string]any)["forecast"].(map[string]any)["data"].(map[string]any)["hypocenter"].(map[string]any)
+			hypocenter["quality"].(map[string]any)["magnitudePoints"] = 0
 		},
 	} {
 		var m map[string]any

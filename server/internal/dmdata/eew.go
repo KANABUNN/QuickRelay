@@ -138,7 +138,11 @@ func forecastData(b *xmlNode) (*eew.ForecastData, error) {
 	quality := eew.HypocenterQuality{Kind: "estimated", EpicenterRank: ac.child("Epicenter").attr("rank"),
 		EpicenterRank2: ac.child("Epicenter").attr("rank2"), DepthRank: ac.child("Depth").attr("rank"),
 		MagnitudeRank: ac.child("MagnitudeCalculation").attr("rank")}
-	if n, err := strconv.Atoi(ac.get("NumberOfMagnitudeCalculation")); err == nil && n >= 0 {
+	// NumberOfMagnitudeCalculation is a JMA code, not a count: 1 is one station,
+	// the level method or an assumed hypocenter, 2–4 the number of stations and
+	// 5 five or more. 0 is unknown (magnitudes from the NIED system carry it);
+	// it and undefined codes are left out so that no receiver reads them as none.
+	if n, err := strconv.Atoi(ac.get("NumberOfMagnitudeCalculation")); err == nil && n >= 1 && n <= 5 {
 		quality.MagnitudePoints = &n
 	}
 	// Same qualification as the relay's notification text.

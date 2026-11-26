@@ -118,7 +118,10 @@
         "revision": {"$ref": "#/$defs/Decimal"},
         "source": {"$ref": "#/$defs/Source"},
         "data": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/ForecastData"}]},
-        "speechUntil": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]}
+        "speechUntil": {
+          "description": "Latest speech start: source.issuedAt plus 10 s (active) or 30 s (canceled). Null for status final, whose reading the receiver decides, and when the issue time is missing or more than a minute ahead of reception.",
+          "oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]
+        }
       }
     },
     "WarningSeries": {
@@ -129,7 +132,10 @@
         "revision": {"$ref": "#/$defs/Decimal"},
         "source": {"$ref": "#/$defs/Source"},
         "data": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/WarningData"}]},
-        "speechUntil": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]}
+        "speechUntil": {
+          "description": "Latest speech start: source.issuedAt plus 15 s (active) or 30 s (canceled); null when the issue time is missing or implausible.",
+          "oneOf": [{"type": "null"}, {"$ref": "#/$defs/Time"}]
+        }
       }
     },
     "Source": {
@@ -169,15 +175,22 @@
         "latitude": {"type": ["number", "null"]},
         "longitude": {"type": ["number", "null"]},
         "quality": {
+          "description": "Ranks are JMA codes as published.",
           "type": "object",
           "required": ["kind"],
           "properties": {
-            "kind": {"enum": ["estimated", "assumed", "lowAccuracy"]},
+            "kind": {
+              "description": "assumed: Condition 仮定震源要素 or MagnitudeCalculation rank 8 (P/S-wave level exceeded). lowAccuracy: otherwise Epicenter rank 1 (IPF, one station). estimated: otherwise.",
+              "enum": ["estimated", "assumed", "lowAccuracy"]
+            },
             "epicenterRank": {"type": "string"},
             "epicenterRank2": {"type": "string"},
             "depthRank": {"type": "string"},
             "magnitudeRank": {"type": "string"},
-            "magnitudePoints": {"type": "integer"}
+            "magnitudePoints": {
+              "description": "JMA NumberOfMagnitudeCalculation code, not a count: 1 one station, level method or assumed hypocenter; 2-4 stations; 5 five or more. Absent when unknown (JMA code 0, as for magnitudes from the NIED system).",
+              "type": "integer", "minimum": 1, "maximum": 5
+            }
           }
         }
       }
@@ -233,7 +246,7 @@
       }
     },
     "ActiveRegion": {
-      "description": "sourceRef is warning.source.telegramId or a telegramId in regionSources; both fields are null when the adding report was not received.",
+      "description": "sourceRef is warning.source.telegramId or a telegramId in regionSources; both fields are null when the adding report was not received. speechUntil is 15 s after the issue of the report that added the region and is not extended by later reports.",
       "allOf": [{"$ref": "#/$defs/Region"}],
       "type": "object",
       "required": ["sourceRef", "speechUntil"],
