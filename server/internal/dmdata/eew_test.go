@@ -23,8 +23,12 @@ func TestParseEEWForecastSample(t *testing.T) {
 	}
 	d := got.Forecast
 	if d == nil || d.Hypocenter == nil || d.Hypocenter.Name != "豊後水道" || d.Hypocenter.Code != "681" || d.Hypocenter.Quality.Kind != "estimated" ||
-		*d.Hypocenter.Latitude != 33.1 || *d.Hypocenter.Longitude != 132.4 || d.Hypocenter.Quality.MagnitudeRank != "2" || *d.Hypocenter.Quality.MagnitudePoints != 0 {
+		*d.Hypocenter.Latitude != 33.1 || *d.Hypocenter.Longitude != 132.4 || d.Hypocenter.Quality.MagnitudeRank != "2" {
 		t.Fatal("hypocenter", d)
+	}
+	// The NIED system's magnitude gives NumberOfMagnitudeCalculation 0 (unknown), not zero stations.
+	if d.Hypocenter.Quality.MagnitudePoints != nil {
+		t.Fatal("unknown magnitude points sent as", *d.Hypocenter.Quality.MagnitudePoints)
 	}
 	if *d.Magnitude != 4.2 || *d.DepthKm != 40 || *d.OriginTime != "2024-04-17T14:14:47Z" {
 		t.Fatal("values", *d.Magnitude, *d.DepthKm, *d.OriginTime)
@@ -44,6 +48,9 @@ func TestParseEEWRegionForecasts(t *testing.T) {
 	regions := got.Forecast.RegionForecasts
 	if len(regions) != 9 || got.Forecast.MaxIntensity != (eew.Intensity{Kind: "exact", Value: "5-"}) {
 		t.Fatal(len(regions), got.Forecast.MaxIntensity)
+	}
+	if p := got.Forecast.Hypocenter.Quality.MagnitudePoints; p == nil || *p != 5 {
+		t.Fatal("magnitude points code 5 (five or more)", p)
 	}
 	first, second, last := regions[0], regions[1], regions[8]
 	if first.Code != "622" || first.Name != "愛媛県南予" || first.PrefectureCode != "9380" || first.CodeType != "地震情報／細分区域" ||
@@ -124,6 +131,15 @@ func TestParseEEWCancelFinalAndQualification(t *testing.T) {
 	data = bytes.Replace(source, []byte(">4.2</jmx_eb:Magnitude>"), []byte(">NaN</jmx_eb:Magnitude>"), 1)
 	if got, _ = ParseEEW(transport(t, "VXSE45", "xml", data)); got.Forecast.Magnitude != nil {
 		t.Fatal("unknown magnitude invented")
+	}
+	// Magnitude points are JMA codes: 1–5 pass through, 0 (unknown) and undefined codes are left out.
+	for code, want := range map[string]int{"1": 1, "4": 4, "5": 5, "9": 0, "": 0} {
+		data = bytes.Replace(source, []byte("<NumberOfMagnitudeCalculation>0<"), []byte("<NumberOfMagnitudeCalculation>"+code+"<"), 1)
+		got, err = ParseEEW(transport(t, "VXSE45", "xml", data))
+		p := got.Forecast.Hypocenter.Quality.MagnitudePoints
+		if err != nil || want == 0 && p != nil || want != 0 && (p == nil || *p != want) {
+			t.Fatal("magnitude points", code, p, err)
+		}
 	}
 }
 

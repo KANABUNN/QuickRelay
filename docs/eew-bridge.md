@@ -1,11 +1,12 @@
 # EEW ブリッジの状態管理と WSS 配信
 
-読み上げ用の別プログラムへ配信する緊急地震速報（EEW）の状態を、QuickRelay とは別のサービス（`eew-bridge`）とデータベース（`bridge.db`）で管理し、WSS で配信します。このページでは次の内容を説明します。
+読み上げ用の別プログラム（QuickRelay Voice、以下 QRV）へ配信する緊急地震速報（EEW）の状態を、QuickRelay とは別のサービス（`eew-bridge`）とデータベース（`bridge.db`）で管理し、WSS で配信します。このページでは次の内容を説明します。
 
 - 電文の解析と系列の状態遷移
 - 配信ログ
 - 受け渡しの取込
 - WSS の契約
+- QRV との分担と調整する場所
 - 運用コマンド
 - 複製 DB を使った無音検証
 
@@ -66,9 +67,15 @@ VXSE43 の `Head/Headline/Information` のうち、`Kind=31` の地域を `(code
 - 予報：10 秒
 - 警報：15 秒。警報地域は、その地域を追加した報から 15 秒。
 - 明示取消：30 秒
-- 予報の最終報：`null`（発話の候補にしない）
+- 予報の最終報：`null`
 
 発表時刻が VPS の受信時刻より 1 分以上先なら、時計の異常として期限を `null` にします。
+
+期限は読み上げを始めてよい上限です。QRV は同じ秒数の上限を持ち、ブリッジの期限と QRV の上限の早いほうまでに始められない報は読みません。
+
+- 期限を縮める変更は、ブリッジだけで効きます。
+- 期限を延ばす変更は、QRV を先に変えます。QRV は上の秒数を超える期限を契約違反として扱い、その電文を受け付けません。
+- 最終報を読み上げるかどうかは受信側が決めます。QRV は最終報も発表から 10 秒以内なら読み上げ、その期限を自分で計算します。現行の QRV は最終報に期限が入っていると電文を受け付けないため、ブリッジは最終報の期限を `null` のままにします。
 
 ## イベントの JSON
 
@@ -104,7 +111,31 @@ VXSE43 の `Head/Headline/Information` のうち、`Kind=31` の地域を `(code
 - `maxIntensity`、`maxLongPeriodClass`
 - `regionForecasts`：地域ごとの予想震度、長周期地震動階級、到達情報
 
-`quality.kind` は `estimated`、`assumed`（仮定震源要素・レベル法）、`lowAccuracy`（1 点観測など）のいずれかです。`assumed` のとき、`originTime`・`magnitude`・`depthKm` は仮の値なので `null` にします。震度の `kind` は `exact`、`range`、`lowerBound`、`unknown` のいずれかで、不明を 0 として扱いません。到達情報は `condition`（`predicted`、`arrived`、`noPrediction`、`unknown`）と時刻を分けて持ちます。警報の `data` には規模・深さ・予想震度を含めません。
+震度の `kind` は `exact`、`range`、`lowerBound`、`unknown` のいずれかで、不明を 0 として扱いません。到達情報は `condition`（`predicted`、`arrived`、`noPrediction`、`unknown`）と時刻を分けて持ちます。警報の `data` には規模・深さ・予想震度を含めません。
+
+### 震源の精度
+
+`hypocenter.quality.kind` は、`Body/Earthquake` の値から上の行を優先して決めます。QuickRelay の通知文と同じ判定です。
+
+| `kind` | 条件 | QRV の読み上げ |
+| --- | --- | --- |
+| `assumed` | `Condition`（仮定震源要素）がある。または `MagnitudeCalculation` の `rank` が 8（P 波／S 波レベル越え、仮定震源要素）。 | 「震源は仮定」 |
+| `lowAccuracy` | `Epicenter` の `rank` が 1（IPF 法 1 点）。 | 「1点観測」 |
+| `estimated` | 上のどちらでもない。 | なし |
+
+`assumed` のとき、`originTime`・`magnitude`・`depthKm` は仮の値なので `null` にします。
+
+`epicenterRank`・`epicenterRank2`・`depthRank`・`magnitudeRank` は、気象庁のコードを文字列のまま送ります。
+
+`magnitudePoints` は `NumberOfMagnitudeCalculation` のコードで、観測点の数ではありません。
+
+| 値 | 意味 |
+| --- | --- |
+| 1 | 1 点、P 波／S 波レベル越え、または仮定震源要素 |
+| 2〜4 | 観測点の数 |
+| 5 | 5 点以上 |
+
+気象庁のコード 0（不明）と未定義のコードは送りません。防災科研のシステムで計算したマグニチュードの報は 0 なので、`magnitudePoints` がありません。観測点の数で読み上げを絞る場合も、項目がないことを観測点 0 と解釈しないでください。
 
 ## bridge.db
 
@@ -154,6 +185,41 @@ VXSE43 の `Head/Headline/Information` のうち、`Kind=31` の地域を `(code
 | 4410 | トークンが失効した。新しいトークンが必要。 |
 | 4413 | フレームまたは同期が上限を超えた。 |
 | 4429 | 送信が詰まった（1 フレームの書き込みが 5 秒を超えた）。再接続する。 |
+
+## QRV との分担
+
+ブリッジは気象庁の電文を、意味を変えずに状態として配信します。読み上げの文、続報で伝える項目、地名の読み方、対象地域、最低震度は QRV が決めます。
+
+QRV（main の `0a47fb1` 時点）は、`delivery=live`・`cause=telegram` で届いた `origin=live` の報だけを読み上げ、次の項目を使います。
+
+| 項目 | QRV での使い方 |
+| --- | --- |
+| `source.serial`、予報の `status=final` | 「第N報」「最終報」 |
+| `hypocenter.name`、`quality.kind` | 震源の名前、「震源は仮定」「1点観測」 |
+| `maxIntensity`、`magnitude`、`depthKm`、`maxLongPeriodClass` | 値と、前に読み上げた値からの「上昇」「低下」「変更」 |
+| `regionForecasts` の `codeType`・`code`・`name`・`maxIntensity` | 地域を絞ったときの地域の予想震度と、最低震度の判定 |
+| 警報の `addedRegions`・`activeRegions`（`level`・`sourceRef`・`speechUntil`）、`regionSources` | 警報地域。府県予報区（`level=prefecture`）の名前を優先して読む |
+| 各系列の `speechUntil`、`source.issuedAt` | 読み上げを始めてよい期限 |
+
+`arrival`、`isWarning`、`kindCode`、`prefectureCode`、緯度経度、精度のコード、`magnitudePoints`、`coverage` は、配信しても QRV の読み上げには使いません。
+
+### 調整する場所
+
+| 変えたいこと | 場所 | 注意 |
+| --- | --- | --- |
+| 読み上げの文、続報で伝える項目、対象地域、最低震度 | QRV | ブリッジの変更は不要。 |
+| 地名の読み方 | QRV の `readings.json` | ブリッジは気象庁の名称をそのまま送る。 |
+| 音声開始期限 | `server/internal/eew/types.go` の `ForecastSpeechLimit` など | 延ばすときは QRV が先。[音声開始期限](#音声開始期限)を参照。 |
+| 震源の精度の区分 | `server/internal/dmdata/eew.go` の `forecastData` | QuickRelay の通知文と同じ判定にそろえる。 |
+| 配信する項目 | `server/internal/eew/types.go`、`contracts/eew-wss.schema.json`、`contracts/examples/eew-*.valid.json` | v1 で増やせるのは任意の項目だけ。QRV は知らない項目を無視する。項目を必須にする、型や意味を変える場合は `schemaVersion` を上げる。 |
+
+ブリッジを変えたら、`server` で次を実行します。このテストは、サーバーの出力が JSON Schema に合うことも確かめます。
+
+```sh
+go test ./internal/dmdata ./internal/eew ./internal/eewbridge
+```
+
+状態遷移を変えた場合は、[複製 DB による無音検証](#複製-db-による無音検証)で過去の報の判定も比べます。`contracts/examples/eew-*.valid.json` を変えた場合は、QRV の `QuickRelay.Voice.Checks/ContractExamples` に同じファイルを入れ、QRV の確認を実行します。
 
 ## 運用
 
