@@ -273,7 +273,7 @@ enum ValueText {
         return nil
     }
 
-    /// JMA accuracy ranks as published, e.g. "震央 4/4 · 深さ 4 · M 2（M計算 5点）".
+    /// JMA accuracy ranks as published, e.g. "震央 4/4 · 深さ 4 · M 2（M計算 5点以上）".
     static func accuracy(_ value: HypocenterDTO?) -> String? {
         guard let accuracy = value?.accuracy else { return nil }
         var parts: [String] = []
@@ -283,7 +283,13 @@ enum ValueText {
         if let depth = accuracy.depth, !depth.isEmpty { parts.append("深さ " + depth) }
         if let magnitude = accuracy.magnitude, !magnitude.isEmpty { parts.append("M " + magnitude) }
         var text = parts.joined(separator: " · ")
-        if let points = accuracy.magnitudePoints { text += "（M計算 \(points)点）" }
+        // NumberOfMagnitudeCalculation is a code, not a count: 5 is five or more.
+        // 0 (unknown) is not sent but may remain in stored reports; it is not "0点".
+        switch accuracy.magnitudePoints {
+        case 5?: text += "（M計算 5点以上）"
+        case let points? where (1...4).contains(points): text += "（M計算 \(points)点）"
+        default: break
+        }
         return text.isEmpty ? nil : text
     }
 

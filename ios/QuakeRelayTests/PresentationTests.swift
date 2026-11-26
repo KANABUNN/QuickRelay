@@ -197,7 +197,14 @@ final class PresentationTests: XCTestCase {
         XCTAssertEqual(ValueText.magnitude(HypocenterDTO(status: "estimated", magnitude: 5.8, magnitudeText: "Ｍ５．８")), "M5.8")
         let ranked = HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(epicenter: "4", epicenterSecondary: "4",
                                                                                       depth: "4", magnitude: "2", magnitudePoints: 5))
-        XCTAssertEqual(ValueText.accuracy(ranked), "震央 4/4 · 深さ 4 · M 2（M計算 5点）")
+        XCTAssertEqual(ValueText.accuracy(ranked), "震央 4/4 · 深さ 4 · M 2（M計算 5点以上）")
+        let few = HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(depth: "4", magnitudePoints: 3))
+        XCTAssertEqual(ValueText.accuracy(few), "深さ 4（M計算 3点）")
+        // Code 0 is unknown (NIED magnitudes), not zero stations; stored reports may still carry it.
+        let unknownPoints = HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(depth: "4", magnitude: "2", magnitudePoints: 0))
+        XCTAssertEqual(ValueText.accuracy(unknownPoints), "深さ 4 · M 2")
+        XCTAssertNil(ValueText.accuracy(HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(magnitudePoints: 0))))
+        XCTAssertNil(ValueText.accuracy(HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(magnitudePoints: 6))))
         XCTAssertEqual(ValueText.accuracy(HypocenterDTO(status: "estimated", accuracy: HypocenterAccuracyDTO(epicenter: "1"))), "震央 1")
         XCTAssertNil(ValueText.accuracy(HypocenterDTO(status: "estimated")))
         XCTAssertTrue(HypocenterDetailRows.hasContent(ranked))
