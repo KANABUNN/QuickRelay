@@ -1,7 +1,5 @@
 name: Verify Quick Relay
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -51,12 +49,18 @@ jobs:
           git diff --check
   ios:
     name: iOS Simulator
-    runs-on: macos-15
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Show Xcode and SDK versions
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
       - name: Build and test the existing Xcode project
         run: sh ios/Scripts/test.sh
       - name: Build the watchOS companion for simulator

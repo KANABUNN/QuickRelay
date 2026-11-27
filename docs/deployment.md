@@ -58,7 +58,7 @@ sudo sh deploy/install.sh || exit 1
 sudo sha256sum /opt/quick-relay/quakerelay /opt/quick-relay/apns-send >> "$DEPLOY_RECORD"
 ```
 
-clone時のmain先端が検証済みとは限りません。引継ぎのSHAと、そのSHAを検証したCIのリンクを記録し、mainに含まれることを上記で確認します。squash/rebaseでSHAが変わった場合は、実際に配備するSHAでCIとローカル検証を確認し直します。配備後も対象SHAを記録から辿れるようにしてください。
+clone時のmain先端が検証済みとは限りません。引継ぎのSHAと、そのSHAを検証したCIのリンクを記録し、mainに含まれることを上記で確認します。PRのマージ後に配備対象のSHAでCIを実行するには、GitHub Actionsで検証ワークフローの `Run workflow` を開き、`main` を選択します。実行結果のSHAが配備対象と一致し、CIとローカル検証が成功したことを確認します。配備後も対象SHAを記録から辿れるようにしてください。
 
 Goは公式配布JSONから1.26以上のstableを選び、公式SHA-256照合後にこのcheckout内へ展開します。すでに対応Goがある場合はbootstrapとPATH設定を省略できます。記録したビルド元・配置先binaryのハッシュがそれぞれ一致することを確認します。installはoffline設定を作り、ランダムなPAIRING_SECRETをファイル内だけに保存します。既存設定は上書きしません。
 

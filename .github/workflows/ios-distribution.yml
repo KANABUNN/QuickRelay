@@ -1,8 +1,6 @@
 name: iOS distribution readiness
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,16 +9,18 @@ concurrency:
   cancel-in-progress: true
 jobs:
   distribution:
-    runs-on: macos-26
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Check App Store SDK requirement
+      - name: Check Xcode and iOS SDK
         run: |
           xcodebuild -version
-          test "$(xcrun --sdk iphoneos --show-sdk-version | cut -d. -f1)" -ge 26
+          test "$(xcrun --sdk iphoneos --show-sdk-version)" = 27.2
       - name: Run simulator tests
         run: sh ios/Scripts/test.sh
       - name: Build the watchOS companion for simulator

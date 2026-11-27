@@ -4,7 +4,7 @@
 
 ## 実行
 
-GitHub Actionsの「iOS acceptance without a physical device」はPR、main更新、手動実行で動きます。Macでは次を実行できます。
+GitHub Actionsの「iOS acceptance without a physical device」はPRと手動実行で動きます。Macでは次を実行できます。
 
     python3 scripts/verify-ios-acceptance.py --source-mode candidate
 

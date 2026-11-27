@@ -41,8 +41,9 @@ It does not submit an App Store version or create a public invitation link.
    team, so obtain approval for that scope before creating or transferring one.
    APNs provider keys, DMDATA credentials and VPS settings are not CI inputs.
 
-4. Open a PR and wait for `iOS distribution readiness` to pass with Xcode/iOS SDK
-   26 or newer. It runs simulator tests and a Release archive without secrets,
+4. Open a PR and wait for `iOS distribution readiness` to pass. This check and
+   the TestFlight upload use Xcode 27.2 with the iOS and watchOS 27.2 SDKs.
+   The check runs simulator tests and a Release archive without secrets,
    compiles the watchOS simulator target, then verifies compiled icons, privacy
    manifests, notification sounds, production APNs configuration and the embedded
    `Watch/QuickRelayWatch.app` identity, companion ID and matching versions.
