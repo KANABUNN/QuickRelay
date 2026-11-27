@@ -64,11 +64,24 @@ func TestEEWWarningDetailsKeepDisplayRestriction(t *testing.T) {
 }
 
 func TestEEWForecastDetailsRangesAndChanges(t *testing.T) {
-	r := normalizeFixture(t, "VXSE45", fixture(t, "77_01_02_240613_VXSE45.xml"))
+	forecast := fixture(t, "77_01_02_240613_VXSE45.xml")
+	r := normalizeFixture(t, "VXSE45", forecast)
 	h := r.Hypocenter
 	if h.MagnitudeType != "Mj" || h.MagnitudeText != "Ｍ４．５" || h.CoordinateText != "北緯３３．２度　東経１３２．４度　深さ　３０ｋｍ" ||
-		h.Accuracy == nil || h.Accuracy.Depth != "4" || h.Accuracy.Magnitude != "2" || h.Accuracy.MagnitudePoints == nil || *h.Accuracy.MagnitudePoints != 0 {
+		h.Accuracy == nil || h.Accuracy.Depth != "4" || h.Accuracy.Magnitude != "2" {
 		t.Fatalf("forecast hypocenter: %+v %+v", h, h.Accuracy)
+	}
+	// The NIED system's magnitude gives NumberOfMagnitudeCalculation 0 (unknown), not zero stations.
+	if h.Accuracy.MagnitudePoints != nil {
+		t.Fatal("unknown magnitude points sent as", *h.Accuracy.MagnitudePoints)
+	}
+	// Magnitude points are JMA codes: 1–5 pass through, 0 (unknown) and undefined codes are left out.
+	for code, want := range map[string]int{"1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 0, "-1": 0, "": 0} {
+		data := bytes.Replace(forecast, []byte("<NumberOfMagnitudeCalculation>0<"), []byte("<NumberOfMagnitudeCalculation>"+code+"<"), 1)
+		a := normalizeFixture(t, "VXSE45", data).Hypocenter.Accuracy
+		if a == nil || want == 0 && a.MagnitudePoints != nil || want != 0 && (a.MagnitudePoints == nil || *a.MagnitudePoints != want) {
+			t.Fatalf("magnitude points %q: %+v", code, a)
+		}
 	}
 	if r.EEW == nil || r.EEW.Change == nil || r.EEW.Change.Reason != "0" || r.EEW.Change.Description != "" || r.EEW.Headline != "" {
 		t.Fatalf("unchanged forecast: %+v", r.EEW)

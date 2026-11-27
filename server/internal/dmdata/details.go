@@ -155,7 +155,11 @@ func extendHypocenter(h *model.Hypocenter, eq object, warning bool) {
 		h.CoordinateText = str(at(hy, "coordinate", "description"))
 		h.MagnitudeType, h.MagnitudeCondition, h.MagnitudeText = str(mag["type"]), str(mag["condition"]), str(mag["description"])
 		a.Depth, a.Magnitude = str(acc["depth"]), str(acc["magnitudeCalculation"])
-		if n, err := strconv.Atoi(str(acc["numberOfMagnitudeCalculation"])); err == nil && n >= 0 {
+		// NumberOfMagnitudeCalculation is a JMA code, not a count: 1 is one station,
+		// the level method or an assumed hypocenter, 2–4 the number of stations and
+		// 5 five or more. 0 is unknown (magnitudes from the NIED system carry it);
+		// it and undefined codes are left out so that no client reads them as none.
+		if n, err := strconv.Atoi(str(acc["numberOfMagnitudeCalculation"])); err == nil && n >= 1 && n <= 5 {
 			a.MagnitudePoints = &n
 		}
 	}

@@ -101,7 +101,7 @@ final class APIDecodingTests: XCTestCase {
          "hypocenter":{"status":"estimated","origin_time":null,"epicenter":"合成震源","latitude":33.2,"longitude":132.4,
            "depth_km":30,"magnitude":null,"code":"681","land_or_sea":"海域","coordinate_text":"北緯３３．２度",
            "magnitude_type":"Mj","magnitude_condition":"不明","magnitude_text":"Ｍ不明","arrival_time":"2026-11-20T02:59:55Z",
-           "accuracy":{"epicenter":"4","epicenter_secondary":"4","depth":"4","magnitude":"2","magnitude_points":0}},
+           "accuracy":{"epicenter":"4","epicenter_secondary":"4","depth":"4","magnitude":"2","magnitude_points":5}},
          "eew":{"headline":"合成見出し","forecast_max_intensity":{"from":"4","to":"5弱","text":"4〜5弱"},
            "forecast_max_long_period_class":{"from":"1","to":"1","text":"1"},
            "change":{"max_intensity":"1","max_long_period_class":"0","reason":"9","description":"合成説明"},
@@ -122,7 +122,7 @@ final class APIDecodingTests: XCTestCase {
         XCTAssertEqual(hypocenter.code, "681")
         XCTAssertEqual(hypocenter.landOrSea, "海域")
         XCTAssertEqual(hypocenter.magnitudeText, "Ｍ不明")
-        XCTAssertEqual(hypocenter.accuracy?.magnitudePoints, 0)
+        XCTAssertEqual(hypocenter.accuracy?.magnitudePoints, 5)
         XCTAssertEqual(hypocenter.accuracy?.epicenterSecondary, "4")
         let eew = try XCTUnwrap(report.eew)
         XCTAssertEqual(eew.forecastMaxLongPeriodClass?.text, "1")

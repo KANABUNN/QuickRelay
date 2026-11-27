@@ -1,5 +1,7 @@
 package model
 
+import "encoding/json"
+
 // Structured values taken from the JMA telegram. They are optional additions to
 // the existing Report fields and bulletin sections, which remain unchanged for
 // older clients. Values are copied as published; nothing is estimated here.
@@ -10,7 +12,22 @@ type HypocenterAccuracy struct {
 	EpicenterSecondary string `json:"epicenter_secondary,omitempty"`
 	Depth              string `json:"depth,omitempty"`
 	Magnitude          string `json:"magnitude,omitempty"`
-	MagnitudePoints    *int   `json:"magnitude_points,omitempty"`
+	// MagnitudePoints is the NumberOfMagnitudeCalculation code 1–5 (5 is five
+	// or more), not a count; it is absent when unknown.
+	MagnitudePoints *int `json:"magnitude_points,omitempty"`
+}
+
+// UnmarshalJSON drops magnitude point codes outside 1–5. Reports stored before
+// the unknown code 0 was left out carry it, and the API must not serve it.
+func (a *HypocenterAccuracy) UnmarshalJSON(data []byte) error {
+	type plain HypocenterAccuracy
+	if err := json.Unmarshal(data, (*plain)(a)); err != nil {
+		return err
+	}
+	if p := a.MagnitudePoints; p != nil && (*p < 1 || *p > 5) {
+		a.MagnitudePoints = nil
+	}
+	return nil
 }
 
 // IntensityRange is a forecast range (ForecastInt / ForecastLgInt). To may be

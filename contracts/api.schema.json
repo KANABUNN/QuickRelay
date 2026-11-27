@@ -724,7 +724,9 @@
         },
         "magnitude_points": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1,
+          "maximum": 5,
+          "description": "JMA NumberOfMagnitudeCalculation code, not a count: 1 one station, level method or assumed hypocenter; 2-4 stations; 5 five or more. Absent when unknown (JMA code 0, as for magnitudes from the NIED system)."
         }
       }
     },
